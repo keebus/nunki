@@ -124,7 +124,7 @@ typedef struct {
 /**
  * Write the #documentation.
  */
-NUNKI_API NuResult nuCreateContext(NuContextCreateInfo const* info, NuContext* contexth, NuAllocator* allocator);
+NUNKI_API NuResult nuCreateContext(NuContextCreateInfo const* info, NuContext* context, NuAllocator* allocator);
 
 /**
  * Write the #documentation.

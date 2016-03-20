@@ -11,9 +11,9 @@
 /**
  * Write the #documentation.
  */
-NuResult nInitializeDeviceModule(void* windowHandle);
+NuResult nInitializeDevice(void* windowHandle);
 
 /**
  * Write the #documentation.
  */
-void nTerminateDeviceModule(void);
+void nTerminateDevice(void);

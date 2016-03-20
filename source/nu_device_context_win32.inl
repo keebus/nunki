@@ -26,10 +26,10 @@ typedef struct {
 	HDC hdc;
 	HGLRC hglrc;
 	HWND hwnd;
-} NGLContext;
+} NGlContext;
 
 void nDeinitGlContextManager(NGlContextManager* glCM);
-void nDeinitGlContext(NGlContextManager* glCM, NGLContext* context);
+void nDeinitGlContext(NGlContextManager* glCM, NGlContext* context);
 
 NuResult nInitGlContextManager(NGlContextManager* glCM, void* dummyWindowHandle)
 {
@@ -103,7 +103,7 @@ void nDeinitGlContextManager(NGlContextManager* glCM)
 	nZero(glCM);
 }
 
-bool nInitGlContext(NGlContextManager* glCM, void* windowHandle, NGLContext* context)
+bool nInitGlContext(NGlContextManager* glCM, void* windowHandle, NGlContext* context)
 {
 	HWND handle = windowHandle;
 	context->hwnd = handle;
@@ -207,14 +207,19 @@ bool nInitGlContext(NGlContextManager* glCM, void* windowHandle, NGLContext* con
 	return true;
 }
 
-void nDeinitGlContext(NGlContextManager* glCM, NGLContext* context)
+void nDeinitGlContext(NGlContextManager* glCM, NGlContext* context)
 {
 	wglMakeCurrent(NULL, NULL);
 	if (context->hglrc) wglDeleteContext(context->hglrc);
 	if (context->hdc) ReleaseDC(context->hwnd, context->hdc);
 }
 
-void nGlContextSwapBuffers(NGLContext* context)
+void nGlContextMakeCurrent(NGlContext* context)
+{
+	wglMakeCurrent(context->hdc, context->hglrc);
+}
+
+void nGlContextSwapBuffers(NGlContext* context)
 {
 	nAssert(context && "Invalid context provided.");
 	SwapBuffers(context->hdc);

@@ -36,7 +36,7 @@ NuResult nuInitialize(NuInitializeInfo const* info, NuAllocator* allocator)
 		return result;
 	}
 
-	if (result = nInitializeDeviceModule(nGetDummyWindowHandle())) {
+	if (result = nInitializeDevice(nGetDummyWindowHandle())) {
 		nuTerminate();
 		return result;
 	}
@@ -47,7 +47,7 @@ NuResult nuInitialize(NuInitializeInfo const* info, NuAllocator* allocator)
 void nuTerminate(void)
 {
 	EnforceInitialized();
-	nTerminateDeviceModule();
+	nTerminateDevice();
 	nTerminateWindowModule();
 	gInstance.initialized = false;
 }
