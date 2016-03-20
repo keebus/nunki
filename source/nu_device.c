@@ -27,6 +27,8 @@ NuResult nInitializeDevice(void* dummyWindowHandle)
 	NuResult result = nInitGlContextManager(&gDevice.nglContextManager, dummyWindowHandle);
 	if (result) result;
 
+
+
 	return NU_SUCCESS;
 }
 
