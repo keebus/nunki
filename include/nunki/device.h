@@ -78,6 +78,17 @@ typedef struct {
 	uint size; /* unused for vertex buffers */
 } NuBufferView;
 
+typedef enum {
+	NU_UNSIGNED_BYTE,
+	NU_UNSIGNED_SHORT,
+	NU_UNSIGNED_INT,
+} NuIndexType;
+
+typedef struct {
+	NuBufferView bufferView;
+	NuIndexType indexType;
+} NuIndexBufferView;
+
 typedef struct {
 	bool instanceData;
 } NuVertexStreamDesc;
@@ -111,8 +122,8 @@ typedef struct {
 typedef struct
 {
 	NuBufferType type;
-	uint size;
 	NuBufferUsage usage;
+	uint initialSize;
 	void const *initialData;
 } NuBufferCreateInfo;
 
@@ -120,11 +131,40 @@ typedef struct {
 	void* windowHandle;
 } NuContextCreateInfo;
 
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuResult nuCreateVertexLayout(NuVertexLayoutDesc* const info, NuAllocator *allocator, NuVertexLayout* pLayout);
 
 /**
  * Write the #documentation.
  */
-NUNKI_API NuResult nuCreateContext(NuContextCreateInfo const* info, NuContext* context, NuAllocator* allocator);
+NUNKI_API void nuDestroyVertexLayout(NuVertexLayout vlayout, NuAllocator *allocator);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuTechniqueCreateResult nuCreateTechnique(NuTechniqueCreateInfo const *info, NuTechnique *pTechnique);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuResult nuCreateBuffer(NuBufferCreateInfo const* info, NuAllocator* allocator, NuBuffer *buffer);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API void nuDestroyBuffer(NuBuffer buffer, NuAllocator* allocator);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API void nuBufferUpdate(NuBuffer buffer, uint offset, const void* data, uint size);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuResult nuCreateContext(NuContextCreateInfo const* info, NuAllocator* allocator, NuContext* context);
 
 /**
  * Write the #documentation.
@@ -134,74 +174,44 @@ NUNKI_API void nuDestroyContext(NuContext context, NuAllocator* allocator);
 /**
  * Write the #documentation.
  */
-NUNKI_API void nuContextSwapBuffers(NuContext context);
+// NUNKI_API NuViewport nuGetContextViewport(NuContext handle)
 
 /**
  * Write the #documentation.
  */
-// NuViewport nuGetContextViewport(NuContext handle)
+NUNKI_API void nuDeviceClear(NuContext context, NuClearFlags flags, float* color4, float depth, uint stencil);
 
 /**
  * Write the #documentation.
  */
-void nuDeviceClear(NuContext context, NuClearFlags flags, float* color4, float depth, uint stencil);
+NUNKI_API void nuDeviceSetViewport(NuContext context, NuRect2i viewport);
 
 /**
  * Write the #documentation.
  */
-void nuDeviceVewportSet(NuContext context, NuRect2 viewport);
+NUNKI_API void nuDeviceSetTechnique(NuContext context, NuTechnique const technique);
 
 /**
  * Write the #documentation.
  */
-void nuDeviceSetTechnique(NuContext context, NuTechnique const technique);
+NUNKI_API void nuDeviceSetVertexBuffers(NuContext context, uint base, uint count, NuBufferView const *views);
 
 /**
  * Write the #documentation.
  */
-void nuDeviceSetVertexBuffers(NuContext context, uint base, uint count, NuBufferView const *views);
+NUNKI_API void nuDeviceSetConstantBuffers(NuContext context, uint base, uint count, NuBufferView const *views);
 
 /**
  * Write the #documentation.
  */
-void nuDeviceSetConstantBuffers(NuContext context, uint base, uint count, NuBufferView const *views);
+NUNKI_API void nuDeviceDrawArrays(NuContext context, NuPrimitiveType primitive, uint firstVertex, uint numVertices, uint numInstances);
 
 /**
  * Write the #documentation.
  */
-void nuDeviceDrawArrays(NuContext context, NuPrimitiveType primitive, uint firstVertex, uint numVertices, uint numInstances);
+NUNKI_API void nuDeviceDrawIndexed(NuContext context, NuPrimitiveType primitive, NuIndexBufferView indexBuffer, uint firstVertex, uint numIndices, uint numInstances, uint baseVertex);
 
 /**
  * Write the #documentation.
  */
-void nuDeviceDrawIndexed(NuContext context, NuPrimitiveType primitive, uint firstVertex, uint numIndices, uint numInstances, uint baseVertex);
-
-/**
- * Write the #documentation.
- */
-NUNKI_API NuResult nuCreateVertexLayout(NuVertexLayoutDesc* const info, NuVertexLayout* layout);
-
-/**
- * Write the #documentation.
- */
-NUNKI_API void nuDestroyVertexLayout(NuVertexLayout vlayout);
-
-/**
- * Write the #documentation.
- */
-NUNKI_API NuTechniqueCreateResult nuCreateTechnique(NuTechniqueCreateInfo const *info, NuTechnique *techniqueh);
-
-/**
- * Write the #documentation.
- */
-NUNKI_API NuResult nuCreateBuffer(NuBufferCreateInfo const* info, NuBuffer *buffer);
-
-/**
- * Write the #documentation.
- */
-NUNKI_API void nuDestroyBuffer(NuBuffer buffer);
-
-/**
- * Write the #documentation.
- */
-NUNKI_API void nuBufferUpdate(NuBuffer buffer, uint offset, const void* data, uint size);
+NUNKI_API void nuDeviceSwapBuffers(NuContext context);

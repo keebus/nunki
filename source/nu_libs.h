@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include "nu_base.h"
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -149,16 +150,16 @@ nunki_define_min_max(double)
 /*-------------------------------------------------------------------------------------------------
  * array
  *-----------------------------------------------------------------------------------------------*/
-void  nArrayReserveEx(void** parray, uint elementSize, uint capacity);
-void* nArrayPushEx(void** parray, uint elementSize, uint count);
-void  nArrayFree(void* array);
+void  nArrayReserveEx(void** parray, NuAllocator* allocator, uint elementSize, uint capacity);
+void* nArrayPushEx(void** parray, NuAllocator* allocator, uint elementSize, uint count);
+void  nArrayFree(void* array, NuAllocator* allocator);
 void  nArrayClear(void* array);
 uint  nArrayLen(void* array);
 
-#define nArrayPush(parray, type) (type*)nArrayPushEx(parray, sizeof(type), 1)
-#define nArrayPushN(parray, type, N) (type*)nArrayPushEx(parray, sizeof(type), N)
+#define nArrayPush(parray, allocator, type) (type*)nArrayPushEx(parray, allocator, sizeof(type), 1)
+#define nArrayPushN(parray, allocator, type, N) (type*)nArrayPushEx(parray, allocator, sizeof(type), N)
 
 /**
  * Write the #documentation.
  */
-void nArrayAlignUp(void** parray, uint alignment);
+void nArrayAlignUp(void** parray, NuAllocator* allocator, uint alignment);

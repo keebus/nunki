@@ -4,21 +4,14 @@
  * For licensing info see LICENSE.
  */
 
-#pragma once
-
-#include "nunki/window.h"
+#include "nunki/scene2d.h"
 
 /**
  * Write the #documentation.
  */
-NuResult nInitWindowModule(void);
+NuResult nInitScene2D(NuAllocator* allocator);
 
 /**
  * Write the #documentation.
  */
-void nDeinitWindowModule(void);
-
-/**
- * Write the #documentation.
- */
-void* nGetDummyWindowHandle(void);
+void nDeinitScene2D(NuAllocator* allocator);

@@ -8,13 +8,13 @@
 #include "nu_window.h"
 #include "nu_device.h"
 #include "nu_builtin_resources.h"
-#include "nu_scene2d.h"
 #include "nu_base.h"
 #include "nu_libs.h"
 
 static struct {
 	bool initialized;
 	NuAllocator allocator;
+	NBuiltinResources builtins;
 } gInstance;
 
 #define EnforceInitialized() nEnforce(gInstance.initialized, "Nunki uninitialized.");
@@ -48,12 +48,7 @@ NuResult nuInitialize(NuInitializeInfo const* info, NuAllocator* allocator)
 		return result;
 	}
 
-	nInitBuiltinResources(allocator);
-
-	if (result = nInitScene2D(allocator)) {
-		nuTerminate();
-		return result;
-	}
+	nInitBuiltinResources(&gInstance.builtins, allocator);
 
 	return NU_SUCCESS;
 }
@@ -61,8 +56,7 @@ NuResult nuInitialize(NuInitializeInfo const* info, NuAllocator* allocator)
 void nuTerminate(void)
 {
 	EnforceInitialized();
-	nDeinitScene2D(&gInstance.allocator);
-	nDeinitBuiltinResources(&gInstance.allocator);
+	nDeinitBuiltinResources(&gInstance.builtins, &gInstance.allocator);
 	nDeinitDevice();
 	nDeinitWindowModule();
 	gInstance.initialized = false;

@@ -28,8 +28,19 @@ typedef struct {
 	HWND hwnd;
 } NGlContext;
 
+n_threadlocal HGLRC gCurrentContext;
+
 void nDeinitGlContextManager(NGlContextManager* glCM);
 void nDeinitGlContext(NGlContextManager* glCM, NGlContext* context);
+
+static bool MakeCurrent(HDC hDC, HGLRC context)
+{
+	if (gCurrentContext != context) {
+		gCurrentContext = context;
+		return wglMakeCurrent(hDC, context);
+	}
+	return true;
+}
 
 NuResult nInitGlContextManager(NGlContextManager* glCM, void* dummyWindowHandle)
 {
@@ -44,7 +55,7 @@ NuResult nInitGlContextManager(NGlContextManager* glCM, void* dummyWindowHandle)
 	if (!glCM->hDC) {
 		nDebugError("Could not get Device Context from context dummy window.");
 		nDeinitGlContextManager(glCM);
-		return false;
+		return NU_FAILURE;
 	}
 
 	/* Try setting an empty pixel format */
@@ -52,27 +63,27 @@ NuResult nInitGlContextManager(NGlContextManager* glCM, void* dummyWindowHandle)
 	if (!SetPixelFormat(glCM->hDC, 1, &pfd)) {
 		nDebugError("Could not set the preliminary pixel format.");
 		nDeinitGlContextManager(glCM);
-		return false;
+		return NU_FAILURE;
 	}
 
 	glCM->context = wglCreateContext(glCM->hDC);
 	if (!glCM->context) {
 		nDebugError("Could not create OpenGL context.");
 		nDeinitGlContextManager(glCM);
-		return false;
+		return NU_FAILURE;
 	}
 
 	/* Activate the preliminary context */
-	if (!wglMakeCurrent(glCM->hDC, glCM->context)) {
+	if (!MakeCurrent(glCM->hDC, glCM->context)) {
 		nDebugError("Could not set context manager OpenGL context as current.");
 		nDeinitGlContextManager(glCM);
-		return false;
+		return NU_FAILURE;
 	}
 
 	if (gl3wInit()) {
 		nDebugError("Could not initialize OpenGL extensions.");
 		nDeinitGlContextManager(glCM);
-		return false;
+		return NU_FAILURE;
 	}
 
 	int maxglmajor, maxglminor;
@@ -96,14 +107,19 @@ void nDeinitGlContextManager(NGlContextManager* glCM)
 {
 	if (!glCM->initialized) return;
 	if (glCM->context) {
-		wglMakeCurrent(NULL, NULL);
+		MakeCurrent(NULL, NULL);
 		wglDeleteContext(glCM->context);
 	}
 	if (glCM->hDC) ReleaseDC(glCM->dummyWindowHandle, glCM->hDC);
 	nZero(glCM);
 }
 
-bool nInitGlContext(NGlContextManager* glCM, void* windowHandle, NGlContext* context)
+void nGlContextManagerMakeCurrent(NGlContextManager* glCM)
+{
+	//MakeCurrent(glCM->hDC, glCM->context);
+}
+
+NuResult nInitGlContext(NGlContextManager* glCM, void* windowHandle, NGlContext* context)
 {
 	HWND handle = windowHandle;
 	context->hwnd = handle;
@@ -112,7 +128,7 @@ bool nInitGlContext(NGlContextManager* glCM, void* windowHandle, NGlContext* con
 	context->hdc = GetDC(context->hwnd);
 	if (!context->hdc) {
 		nDebugError("Could not obtain a device context for the window.");
-		return false;
+		return NU_FAILURE;
 	}
 
 	/* Create the GL context */
@@ -139,7 +155,7 @@ bool nInitGlContext(NGlContextManager* glCM, void* windowHandle, NGlContext* con
 	if (pixelformat < 0) {
 		nDebugError("Could not obtain a pixel format compatible to requested parameters.");
 		nDeinitGlContext(glCM, context);
-		return false;
+		return NU_FAILURE;
 	}
 
 	int attrib[] = { WGL_SAMPLES_ARB };
@@ -151,7 +167,7 @@ bool nInitGlContext(NGlContextManager* glCM, void* windowHandle, NGlContext* con
 		DWORD error = GetLastError();
 		nDebugError("Could not set window pixel format.");
 		nDeinitGlContext(glCM, context);
-		return false;
+		return NU_FAILURE;
 	}
 
 	/* Prepare the attributes used for creating the GL context */
@@ -172,39 +188,29 @@ bool nInitGlContext(NGlContextManager* glCM, void* windowHandle, NGlContext* con
 	if (!context->hglrc) {
 		nDebugError("Could not create OpenGL context.");
 		nDeinitGlContext(glCM, context);
-		return false;
+		return NU_FAILURE;
 	}
 
-	if (!wglMakeCurrent(context->hdc, context->hglrc)) {
+	if (!MakeCurrent(context->hdc, context->hglrc)) {
 		nDebugError("Could not set newly created OpenGL context as current.");
 		nDeinitGlContext(glCM, context);
-		return false;
+		return NU_FAILURE;
 	}
 
 	if (gl3wInit()) {
 		nDebugError("Could not initialize OpenGL extensions.");
 		nDeinitGlContext(glCM, context);
-		return false;
+		return NU_FAILURE;
 	}
 
-	/* initialize the context */
-	GLuint vao;
-	glGenVertexArrays(1, &vao);
-	if (!vao) {
-		nDebugError("Could not create context default VAO.");
-		nDeinitGlContext(glCM, context);
-		return false;
-	}
-	glBindVertexArray(vao);
+	///* reset the context to manager's */
+	//if (!MakeCurrent(glCM->hDC, glCM->context)) {
+	//	nDebugError("Could not restore context manager GL context.");
+	//	nDeinitGlContext(glCM, context);
+	//	return NU_FAILURE;
+	//}
 
-	/* reset the context to manager's */
-	if (!wglMakeCurrent(glCM->hDC, glCM->context)) {
-		nDebugError("Could not restore context manager GL context.");
-		nDeinitGlContext(glCM, context);
-		return false;
-	}
-
-	return true;
+	return NU_SUCCESS;
 }
 
 void nDeinitGlContext(NGlContextManager* glCM, NGlContext* context)
@@ -216,7 +222,7 @@ void nDeinitGlContext(NGlContextManager* glCM, NGlContext* context)
 
 void nGlContextMakeCurrent(NGlContext* context)
 {
-	wglMakeCurrent(context->hdc, context->hglrc);
+	//MakeCurrent(context->hdc, context->hglrc);
 }
 
 void nGlContextSwapBuffers(NGlContext* context)

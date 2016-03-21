@@ -5,6 +5,7 @@
  */
 
 #include "nu_libs.h"
+#include "nu_base.h"
 #include <stdarg.h>
 #include <stdio.h>
 
@@ -77,62 +78,62 @@ static inline ArrayHeader* getArrayHeader(void* array)
 	return nAlignPtrDown((ArrayHeader*)array - 1, n_alignof(void*));
 }
 
-void nArrayReserveEx(void** parray, uint elementSize, uint capacity)
+void nArrayReserveEx(void** parray, NuAllocator* allocator, uint elementSize, uint capacity)
 {
 	ArrayHeader* header = getArrayHeader(*parray);
 
 	/* reallocate if necessary */
 	if (!*parray || header->capacity < capacity) {
 		const uint old_capacity = *parray ? header->capacity : 10u;
-		const uint old_length = *parray ? header->length : 0;
-		const uint new_capacity = max_uint(old_capacity * 2, capacity);
+		const uint oldLength = *parray ? header->length : 0;
+		const uint newCapacity = max_uint(old_capacity * 2, capacity);
 
 		/* compute the total size */
-		uint total_size = n_alignof(void*) + sizeof(ArrayHeader); // max alignment + size of header
-		total_size = (uint)nAlignUintUp(total_size, n_alignof(void*)); // add padding for type alignment
+		uint totalSize = n_alignof(void*) + sizeof(ArrayHeader); // max alignment + size of header
+		totalSize = (uint)nAlignUintUp(totalSize, n_alignof(void*)); // add padding for type alignment
 
-		uint data_offset = total_size - n_alignof(void*);  // remember the offset in bytes from the allocation pointer to the actual data array
+		uint dataOffset = totalSize - n_alignof(void*);  // remember the offset in bytes from the allocation pointer to the actual data array
 
-		total_size += elementSize * new_capacity; // actual storage of values
-		total_size -= n_alignof(void*); // remove max alignment
+		totalSize += elementSize * newCapacity; // actual storage of values
+		totalSize -= n_alignof(void*); // remove max alignment
 
 		/* allocate the new array and copy the data over */
-		ArrayHeader* new_array_header = malloc(total_size);
-		void* new_array = (char*)new_array_header + data_offset;
+		ArrayHeader* new_array_header = nMalloc(totalSize, allocator);
+		void* new_array = (char*)new_array_header + dataOffset;
 
 		if (*parray) {
-			memcpy(new_array, *parray, elementSize * old_length);
-			free(header);
+			memcpy(new_array, *parray, elementSize * oldLength);
+			nFree(header, allocator);
 		}
 
 		header = new_array_header;
-		header->capacity = new_capacity;
-		header->length = old_length;
+		header->capacity = newCapacity;
+		header->length = oldLength;
 
 		*parray = new_array;
 	}
 }
 
-void* nArrayPushEx(void** parray, uint elementSize, uint count)
+void* nArrayPushEx(void** parray, NuAllocator* allocator, uint elementSize, uint count)
 {
 	uint old_length = nArrayLen(*parray);
 	uint new_length = old_length + count;
 
-	nArrayReserveEx(parray, elementSize, new_length);
+	nArrayReserveEx(parray, allocator, elementSize, new_length);
 	getArrayHeader(*parray)->length = new_length;
 
 	return ((char*)*parray) + old_length * elementSize;
 }
 
-void nArrayFree(void* array)
+void nArrayFree(void* array, NuAllocator* allocator)
 {
-	if (array) free(getArrayHeader(array));
+	if (array) nFree(getArrayHeader(array), allocator);
 }
 
 void nArrayClear(void* array)
 {
 	ArrayHeader* header = getArrayHeader(array);
-	if (header) header->length = 0;
+	if (array) header->length = 0;
 }
 
 uint nArrayLen(void* array)
@@ -140,13 +141,13 @@ uint nArrayLen(void* array)
 	return array ? getArrayHeader(array)->length : 0;
 }
 
-void nArrayAlignUp(void** parray, uint alignment)
+void nArrayAlignUp(void** parray, NuAllocator* allocator, uint alignment)
 {
 	if (!*parray) {
-		nArrayReserveEx(parray, 1, 1);
+		nArrayReserveEx(parray, allocator, 1, 1);
 	}
 	ArrayHeader* header = getArrayHeader(*parray);
 	char* back = (char*)*parray + header->length;
 	uint64_t offset = (char*)nAlignPtrUp(back, alignment) - back;
-	nArrayPushEx(parray, 1, (uint)offset);
+	nArrayPushEx(parray, allocator, 1, (uint)offset);
 }

@@ -6,8 +6,4 @@
 
 #pragma once
 
-#include "nunki/base.h"
-#include "nunki/root.h"
-#include "nunki/window.h"
-#include "nunki/device.h"
-#include "nunki/scene2d.h"
+void nOrtho(float left, float top, float right, float bottom, float near, float far, float* matrix);

@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "nu_libs.h"
+#include "nunki/base.h"
 #include <string.h>
 
 extern const NuAllocator nDefaultAllocator;

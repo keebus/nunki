@@ -26,7 +26,7 @@
 typedef unsigned int uint;
 
 #define NU_HANDLE(name) typedef struct name##Impl* name;
-#define NU_HANDLE_INDEX(name) typedef struct { size_t i; } name;
+#define NU_HANDLE_INDEX(name) typedef size_t name;
 
 typedef enum NuResult {
 	NU_SUCCESS,
@@ -42,12 +42,25 @@ typedef struct NuAllocator {
 	void  (*free)(void* ptr, void* userData);
 } NuAllocator;
 
-typedef struct NuPoint2 {
+typedef struct NuPoint2i {
 	int x, y;
+} NuPoint2i;
+
+typedef struct NuSize2i {
+	int width, height;
+} NuSize2i;
+
+typedef struct NuRect2i {
+	NuPoint2i position;
+	NuSize2i  size;
+} NuRect2i;
+
+typedef struct NuPoint2 {
+	float x, y;
 } NuPoint2;
 
 typedef struct NuSize2 {
-	int width, height;
+	float width, height;
 } NuSize2;
 
 typedef struct NuRect2 {

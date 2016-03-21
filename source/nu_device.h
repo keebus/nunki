@@ -11,9 +11,9 @@
 /**
  * Write the #documentation.
  */
-NuResult nInitializeDevice(void* windowHandle);
+NuResult nInitDevice(NuAllocator* allocator, void* windowHandle);
 
 /**
  * Write the #documentation.
  */
-void nTerminateDevice(void);
+void nDeinitDevice(void);

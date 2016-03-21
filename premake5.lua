@@ -4,27 +4,34 @@ newaction {
 
 	onStart = function()
 		shader_h = io.open("source/nu_shaders.h", "w")
-		shader_c = io.open("source/nu_shaders.cpp", "w")
+		shader_c = io.open("source/nu_shaders.c", "w")
 
 		shader_h:write([[
-/* Nunki. Copyright (C) 2015 Canio Massimo Tristano. All rights reserved. */
-/* This is an auto-generated file. Do not edit manually. */
+/*
+ * Nunki (simple rendering engine)
+ * Copyright (C) 2015 Canio Massimo Tristano <massimo.tristano@gmail.com>.
+ * For licensing info see LICENSE.
+ */
 
 #pragma once
 
 ]])
 
 		shader_c:write([[
-/* Nunki. Copyright (C) 2015 Canio Massimo Tristano. All rights reserved. */
-/* This is an auto-generated file. Do not edit manually. */
+/*
+ * Nunki (simple rendering engine)
+ * Copyright (C) 2015 Canio Massimo Tristano <massimo.tristano@gmail.com>.
+ * For licensing info see LICENSE.
+ */
 
 #include "nu_shaders.h"
 
 ]])
 		local shaders = os.matchfiles("source/shaders/*.glsl")
 		for i, shader in pairs(shaders) do
-			local shader_id = "nu_SHADER_SRC_"..string.upper(path.getbasename(shader))
-			shader_h:write(string.format("\t%s\n", shader_id))
+			local shader_id = "N_SHADER_SRC_"..string.upper(path.getbasename(shader))
+			shader_h:write(string.format("extern const char* %s;\n", shader_id))
+			shader_c:write(string.format("const char* %s = ", shader_id))
 			shader_file = io.open(shader)
 			local anyline = false
 			for line in shader_file:lines() do
@@ -38,7 +45,7 @@ newaction {
 			if anyline then
 				shader_c:write(";\n\n")
 			else
-				shader_c:write('"";\n\n')
+				shader_c:write('"";\n')
 			end
 			shader_file:close()
 		end
@@ -92,7 +99,7 @@ solution "Nunki"
 		defines "NUNKI_EXPORT"
 		targetname "nunki"
 		includedirs "include"
-		files { "include/**.h", "source/**.h", "source/**.c", "source/**.glsl" }
+		files { "include/**.h", "source/**.h", "source/**.inl", "source/**.c", "source/**.glsl" }
 		links { "opengl32", "glu32" }
 		configuration {}
 

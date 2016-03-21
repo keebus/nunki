@@ -35,6 +35,8 @@ static LRESULT CALLBACK wndProc(HWND hWnd, UINT uMsg, WPARAM  wParam, LPARAM lPa
 NuResult nuCreateWindow(NuWindowCreateInfo const *info, NuAllocator* allocator, NuWindow *outWindow)
 {
 	EnforceInitialized();
+	allocator = nGetAllocator(allocator);
+
 	nEnforce(info, "Null info provided.");
 	nEnforce(outWindow, "Null handle provided.");
 	
@@ -143,17 +145,19 @@ NuResult nuCreateWindow(NuWindowCreateInfo const *info, NuAllocator* allocator, 
 	return NU_SUCCESS;
 }
 
-void nuDestroyWindow(NuWindow window)
+void nuDestroyWindow(NuWindow window, NuAllocator* allocator)
 {
 	if (!window) return;
+	allocator = nGetAllocator(allocator);
 
-	if (window->fullscreen)
+	if (window->fullscreen) {
 		ChangeDisplaySettings(NULL, 0);
+	}
 
 	DestroyWindow(window->handle);
 	window->handle = 0;
 
-	free(window);
+	nFree(window, allocator);
 }
 
 void nuWindowSetTitle(NuWindow window, const char* title)
@@ -194,7 +198,7 @@ void* nuWindowGetNativeHandle(NuWindow window)
 }
 
 
-NuResult nInitializeWindowModule(void)
+NuResult nInitWindowModule(void)
 {
 	nEnforce(!gWindowModule.initialized, "Window module has already been initialized.");
 	
@@ -235,7 +239,7 @@ NuResult nInitializeWindowModule(void)
 	return NU_SUCCESS;
 }
 
-void nTerminateWindowModule(void)
+void nDeinitWindowModule(void)
 {
 	if (!gWindowModule.initialized) return;
 	ReleaseDC(gWindowModule.dummyWindowHandle, gWindowModule.dummyWindowHDC);

@@ -205,7 +205,7 @@ NUNKI_API NuResult nuCreateWindow(NuWindowCreateInfo const* info, NuAllocator* a
 /**
  * Write the #documentation.
  */
-NUNKI_API void nuDestroyWindow(NuWindow window);
+NUNKI_API void nuDestroyWindow(NuWindow window, NuAllocator* allocator);
 
 /**
  * Write the #documentation.
