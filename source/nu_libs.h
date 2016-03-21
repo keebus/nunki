@@ -147,6 +147,11 @@ nunki_define_min_max(double)
 
 #define nZero(structPtr) memset(structPtr, 0, sizeof *structPtr)
 
+inline uint nSwizzleUInt(uint ui)
+{
+	return (ui >> 24) | ((ui >> 8) & 0x0000ff00) | ((ui << 8) & 0x00ff0000) | (ui << 24);
+}
+
 /*-------------------------------------------------------------------------------------------------
  * array
  *-----------------------------------------------------------------------------------------------*/

@@ -18,6 +18,7 @@ typedef struct {
 } SolidQuad;
 
 typedef enum {
+	CMD_SET_BLEND_STATE,
 	CMD_DRAW,
 } CommandType;
 
@@ -26,10 +27,17 @@ typedef enum {
 } PrimitiveType;
 
 typedef struct {
-	CommandType type;
 	PrimitiveType primitiveType;
 	uint firstInstanceOffset;
 	uint instanceCount;
+} CommandDraw;
+
+typedef struct {
+	CommandType type;
+	union {
+		CommandDraw draw;
+		NuBlendState blendState;
+	};
 } Command;
 
 typedef struct NuScene2DImpl {
@@ -81,6 +89,32 @@ static inline PrimitiveInfo GetPrimitiveInfo(PrimitiveType type)
 }
 
 /* State functions */
+static Command* SetStateChangeDeviceState(NuScene2D scene, CommandType cmdType)
+{
+	/* fetch last command and check whether it matches command type */
+	uint numCommands = nArrayLen(scene->commands);
+	Command *command = NULL;
+
+	if (numCommands > 0) {
+		command = &scene->commands[numCommands - 1];
+
+		/* check command state matches quad drawing command */
+		if (command->type != cmdType) {
+			command = NULL;
+		}
+	}
+
+	/* if last command is not appropriate or there simply are no commands in scene yet make one */
+	if (command == NULL) {
+		command = nArrayPush(&scene->commands, &scene->allocator, Command);
+		*command = (Command) {
+			.type = cmdType,
+		};
+	}
+
+	return command;
+}
+
 static Command* SetStateQuadSolid(NuScene2D scene)
 {
 	/* fetch last command and make sure it matches quads rendering */
@@ -91,7 +125,7 @@ static Command* SetStateQuadSolid(NuScene2D scene)
 		command = &scene->commands[numCommands - 1];
 
 		/* check command state matches quad drawing command */
-		if (command->type != CMD_DRAW || command->primitiveType != PRIMITIVE_SOLID_QUAD) {
+		if (command->type != CMD_DRAW || command->draw.primitiveType != PRIMITIVE_SOLID_QUAD) {
 			command = NULL;
 		}
 	}
@@ -103,8 +137,10 @@ static Command* SetStateQuadSolid(NuScene2D scene)
 		command = nArrayPush(&scene->commands, &scene->allocator, Command);
 		*command = (Command) {
 			.type = CMD_DRAW,
-			.primitiveType = PRIMITIVE_SOLID_QUAD,
-			.firstInstanceOffset = nArrayLen(scene->instanceData),
+			.draw = (CommandDraw) {
+				.primitiveType = PRIMITIVE_SOLID_QUAD,
+				.firstInstanceOffset = nArrayLen(scene->instanceData),
+			}
 		};
 	}
 
@@ -225,7 +261,12 @@ void nu2dPresent(NuScene2D scene)
 		(float)viewport.position.x + viewport.size.width,
 		(float)viewport.position.y + viewport.size.height,
 		0.f, 1.f, constants.transform);
+	
 	nuBufferUpdate(gScene2D.constantBuffer, 0, &constants, sizeof constants);
+
+	nuDeviceSetConstantBuffers(context, 0, 1, (NuBufferView[]) {
+		gScene2D.constantBuffer, 0, 0
+	});
 
 	/* set device viewport */
 	nuDeviceSetViewport(context, viewport);
@@ -235,19 +276,40 @@ void nu2dPresent(NuScene2D scene)
 
 	for (uint i = 0; i < numCommands; ++i) {
 		Command* command = &scene->commands[i];
-		PrimitiveInfo primitiveInfo = GetPrimitiveInfo(command->primitiveType);
 
-		/* set device state */
-		nuDeviceSetTechnique(context, primitiveInfo.technique);
+		switch (command->type) {
+			case CMD_SET_BLEND_STATE:
+			{
+				nuDeviceSetBlendState(context, &command->blendState);
+				break;
+			}
 
-		nuDeviceSetVertexBuffers(context, 0, 2, (NuBufferView[]) {
-			gScene2D.primitivesVertexBuffer, primitiveInfo.primitiveVertexOffset, 0,
-			gScene2D.instancesVertexBuffer, command->firstInstanceOffset, 0,
-		});
+			case CMD_DRAW:
+			{
+				CommandDraw* draw = &command->draw;
+				PrimitiveInfo primitiveInfo = GetPrimitiveInfo(draw->primitiveType);
 
-		/* issue draw */
-		nuDeviceDrawArrays(context, primitiveInfo.devicePrimitiveType, 0, 4, command->instanceCount);
+				/* set device state */
+				nuDeviceSetTechnique(context, primitiveInfo.technique);
+
+				nuDeviceSetVertexBuffers(context, 0, 2, (NuBufferView[]) {
+					gScene2D.primitivesVertexBuffer, primitiveInfo.primitiveVertexOffset, 0,
+						gScene2D.instancesVertexBuffer, draw->firstInstanceOffset, 0,
+				});
+
+				/* issue draw */
+				nuDeviceDrawArrays(context, primitiveInfo.devicePrimitiveType, 0, 4, draw->instanceCount);
+				break;
+			}
+		}
+	
 	}
+}
+
+void nu2dSetBlendState(NuScene2D scene, NuBlendState const* blendState)
+{
+	Command* command = SetStateChangeDeviceState(scene, CMD_SET_BLEND_STATE);
+	command->blendState = *blendState;
 }
 
 void nu2dDrawQuadSolidFlat(NuScene2D scene, NuRect2 rect, uint32_t color)
@@ -257,7 +319,7 @@ void nu2dDrawQuadSolidFlat(NuScene2D scene, NuRect2 rect, uint32_t color)
 	Command* command = SetStateQuadSolid(scene);
 
 	/* push the quad instance */
-	++command->instanceCount;
+	++command->draw.instanceCount;
 	SolidQuad *instance = nArrayPushEx(&scene->instanceData, &scene->allocator, 1, sizeof(SolidQuad));
-	*instance = (SolidQuad) { rect, color };
+	*instance = (SolidQuad) { rect, nSwizzleUInt(color) };
 }

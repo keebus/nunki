@@ -191,6 +191,11 @@ bool nuWindowPollEvents(NuWindow window, NuWindowEvent *e)
 	return e->type != NU_WINDOW_EVENT_TYPE_NONE;
 }
 
+NuSize2i nuWindowGetSize(NuWindow window)
+{
+	return (NuSize2i) { window->width, window->height };
+}
+
 void* nuWindowGetNativeHandle(NuWindow window)
 {
 	nEnforce(window, "Invalid window provided.");

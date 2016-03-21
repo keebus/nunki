@@ -41,5 +41,10 @@ NUNKI_API void nu2dPresent(NuScene2D scene);
 /**
  * Write the #documentation.
  */
+NUNKI_API void nu2dSetBlendState(NuScene2D scene, NuBlendState const* blendState);
+
+/**
+ * Write the #documentation.
+ */
 NUNKI_API void nu2dDrawQuadSolidFlat(NuScene2D scene, NuRect2 rect, uint32_t color);
 

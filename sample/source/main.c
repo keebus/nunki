@@ -35,6 +35,15 @@ int main()
 	NuScene2D scene;
 	nuCreateScene2D(NULL, &scene);
 
+	NuBlendState alphaBlendState = {
+		.srcRgbFactor = NU_BLEND_FACTOR_SRC_ALPHA,
+		.dstRgbFactor = NU_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+		.rgbOp = NU_BLEND_FUNC_ADD,
+		.srcAlphaFactor = NU_BLEND_FACTOR_ONE,
+		.dstAlphaFactor = NU_BLEND_FACTOR_ZERO,
+		.alphaOp = NU_BLEND_FUNC_ADD,
+	};
+
 	NuWindowEvent e;
 	for (;;)
 	{
@@ -48,12 +57,13 @@ int main()
 
 		NuScene2DResetInfo resetInfo = {
 			.context = context,
-			.bounds = (NuRect2i) { 0, 0, 0, 0 },
+			.bounds = (NuRect2i) { 0, 0, nuWindowGetSize(window) },
 		};
 
 		nu2dReset(scene, &resetInfo);
 
-		nu2dDrawQuadSolidFlat(scene, (NuRect2){ 10, 10, 100, 100 }, 0xffffffff);
+		nu2dSetBlendState(scene, &alphaBlendState);
+		nu2dDrawQuadSolidFlat(scene, (NuRect2){ 10, 10, 100, 100 }, 0xff0000ff);
 
 		nu2dPresent(scene);
 

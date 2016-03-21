@@ -210,19 +210,24 @@ NUNKI_API void nuDestroyWindow(NuWindow window, NuAllocator* allocator);
 /**
  * Write the #documentation.
  */
-NUNKI_API void nuWindowSetTitle(NuWindow handle, const char* title);
+NUNKI_API void nuWindowSetTitle(NuWindow window, const char* title);
 
 /**
  * Write the #documentation.
  */
-NUNKI_API void nuWindowShowCursor(NuWindow handle, bool show);
+NUNKI_API void nuWindowShowCursor(NuWindow window, bool show);
 
 /**
  * Write the #documentation.
  */
-NUNKI_API bool nuWindowPollEvents(NuWindow handle, NuWindowEvent *e);
+NUNKI_API bool nuWindowPollEvents(NuWindow window, NuWindowEvent *e);
 
 /**
  * Write the #documentation.
  */
-NUNKI_API void* nuWindowGetNativeHandle(NuWindow handle);
+NUNKI_API NuSize2i nuWindowGetSize(NuWindow window);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API void* nuWindowGetNativeHandle(NuWindow window);

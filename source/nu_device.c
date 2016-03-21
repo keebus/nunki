@@ -53,24 +53,31 @@ typedef struct NuBufferImpl {
 	uint          mapped : 1;
 } Buffer;
 
+typedef struct {
+	GLuint              boundBuffers[3];
+	NuRect2i            viewport;
+	const Technique*    technique;
+	const VertexLayout* vertexLayout;
+	bool                vertexLayoutIsDirty;
+	uint                numActiveAttributes;
+	NuBlendState        blendState;
+	NuBufferView        constantBuffers[MAX_NUM_CONSTANT_BUFFERS];
+	NuBufferView        vertexBuffers[NU_VERTEX_LAYOUT_MAX_STREAMS];
+} State;
+
 typedef struct NuContextImpl {
 	NGlContext nglContext;
-	/* state */
-	GLuint              stateBoundBuffers[3];
-	NuRect2i             stateViewport;
-	const Technique*    stateTechnique;
-	const VertexLayout* stateVertexLayout;
-	bool                stateVertexLayoutIsDirty;
-	uint                stateNumActiveAttributes;
-	NuBufferView        stateConstantBuffers[MAX_NUM_CONSTANT_BUFFERS];
-	NuBufferView        stateVertexBuffers[NU_VERTEX_LAYOUT_MAX_STREAMS];
+	State state;
+	
 } Context;
 
 static struct {
-	bool initialized;
-	NuAllocator allocator;
+	bool              initialized;
+	NuAllocator       allocator;
 	NGlContextManager nglContextManager;
-	Technique* techniques;
+	Technique*        techniques;
+	State             state;
+	State*            currentState;
 } gDevice;
 
 /*-------------------------------------------------------------------------------------------------
@@ -80,6 +87,18 @@ static struct {
 /*-------------------------------------------------------------------------------------------------
  * Static functions
  *-----------------------------------------------------------------------------------------------*/
+
+static inline void BindGlobalContext(void)
+{
+	nGlContextManagerMakeCurrent(&gDevice.nglContextManager);
+	gDevice.currentState = &gDevice.state;
+}
+
+static inline void BindContext(Context* context)
+{
+	nGlContextMakeCurrent(&context->nglContext);
+	gDevice.currentState = &context->state;
+}
 
 #define EnforceInitialized() nEnforce(gDevice.initialized, "Device uninitialized");
 
@@ -154,19 +173,21 @@ static void __stdcall debugCallbackGL(GLenum source, GLenum type, GLuint id, GLe
 	}
 }
 
-static void BindBuffer(Context* context, const Buffer* buffer)
+static void BindBuffer(const Buffer* buffer)
 {
-	if (context->stateBoundBuffers[buffer->type] != buffer->id) {
-		context->stateBoundBuffers[buffer->type] = buffer->id;
+	if (gDevice.currentState->boundBuffers[buffer->type] != buffer->id)
+	{
+		gDevice.currentState->boundBuffers[buffer->type] = buffer->id;
 		glBindBuffer(BufferTypeToGl(buffer->type), buffer->id);
 	}
 }
 
-static void UnbindBuffer(Context* context, const Buffer *buffer)
+static void UnbindBuffer(const Buffer *buffer)
 {
-	if (context->stateBoundBuffers[buffer->type] != buffer->id) {
+	if (gDevice.currentState->boundBuffers[buffer->type] != buffer->id)
+	{
 		glBindBuffer(BufferTypeToGl(buffer->type), 0);
-		context->stateBoundBuffers[buffer->type] = 0;
+		gDevice.currentState->boundBuffers[buffer->type] = 0;
 	}
 }
 
@@ -192,7 +213,7 @@ NuResult nInitDevice(NuAllocator* allocator, void* dummyWindowHandle)
 		return result;
 	}
 
-	nGlContextManagerMakeCurrent(&gDevice.nglContextManager);
+	BindGlobalContext();
 
 	/* setup GL debug callback */
 #ifdef _DEBUG
@@ -279,7 +300,7 @@ static GLuint CreateShader(GLenum type, const char *source, char* message_buffer
 NuTechniqueCreateResult nuCreateTechnique(NuTechniqueCreateInfo const *info, NuTechnique *pTechnique)
 {
 	EnforceInitialized();
-	nGlContextManagerMakeCurrent(&gDevice.nglContextManager);
+	BindGlobalContext();
 
 	nEnforce(info, "Null info provided.");
 	nEnforce(info->vertexShaderSource, "A vertex shader must have been provided.");
@@ -372,8 +393,6 @@ NuResult nuCreateBuffer(NuBufferCreateInfo const* info, NuAllocator* allocator, 
 	nEnforce(info, "Null info provided.");
 	nEnforce(!*pBuffer, "Buffer has already been created.");
 
-	nGlContextManagerMakeCurrent(&gDevice.nglContextManager);
-
 	*pBuffer = NULL;
 
 	GLuint id;
@@ -398,11 +417,8 @@ NuResult nuCreateBuffer(NuBufferCreateInfo const* info, NuAllocator* allocator, 
 void nuDestroyBuffer(NuBuffer buffer, NuAllocator* allocator)
 {
 	EnforceInitialized();
-
 	if (!buffer) return;
-	nGlContextManagerMakeCurrent(&gDevice.nglContextManager);
 
-	glBindBuffer(BufferTypeToGl(buffer->type), 0);
 	glDeleteBuffers(1, &buffer->id);
 	nFree(buffer, GetDeviceAllocator(allocator));
 }
@@ -412,9 +428,7 @@ void nuBufferUpdate(NuBuffer buffer, uint offset, const void* data, uint size)
 	EnforceInitialized();
 	nEnforce(buffer, "Null buffer provided.");
 
-	nGlContextManagerMakeCurrent(&gDevice.nglContextManager);
-
-	glBindBuffer(BufferTypeToGl(buffer->type), buffer->id);
+	BindBuffer(buffer);
 	uint newSize = max_uint(buffer->size, offset + size);
 
 	if (buffer->size < newSize) {
@@ -447,13 +461,15 @@ NuResult nuCreateContext(NuContextCreateInfo const* info, NuAllocator* allocator
 	}
 
 	/* initialize opengl context */
-	nGlContextMakeCurrent(&context->nglContext);
+	BindContext(context);
+	glEnable(GL_BLEND);
 	
 	/* create default VAO */
 	GLuint vao;
 	glGenVertexArrays(1, &vao);
 	nAssert(vao == 1);
 	glBindVertexArray(vao);
+
 
 	*outContext = context;
 	return NU_SUCCESS;
@@ -469,7 +485,7 @@ void nuDestroyContext(NuContext context, NuAllocator* allocator)
 void nuDeviceClear(NuContext context, NuClearFlags flags, float* color4, float depth, uint stencil)
 {
 	EnforceInitialized();
-	nGlContextMakeCurrent(&context->nglContext);
+	BindContext(context);
 	nEnforce(flags != 0, "Some flag must have been set.");
 
 	GLenum glflags = 0;
@@ -494,9 +510,9 @@ void nuDeviceClear(NuContext context, NuClearFlags flags, float* color4, float d
 void nuDeviceSetViewport(NuContext context, NuRect2i rect)
 {
 	EnforceInitialized();
-	nGlContextMakeCurrent(&context->nglContext);
-	if (memcmp(&rect, &context->stateViewport, sizeof rect)) {
-		context->stateViewport = rect;
+	BindContext(context);
+	if (memcmp(&rect, &gDevice.currentState->viewport, sizeof rect)) {
+		gDevice.currentState->viewport = rect;
 		glViewport(rect.position.x, rect.position.y, rect.size.width, rect.size.height);
 	}
 }
@@ -504,24 +520,24 @@ void nuDeviceSetViewport(NuContext context, NuRect2i rect)
 void nuDeviceSetTechnique(NuContext context, NuTechnique const techniqueIndex)
 {
 	EnforceInitialized();
-	nGlContextMakeCurrent(&context->nglContext);
+	BindContext(context);
 	Technique const *technique = DeviceGetTechnique(techniqueIndex);
 	
-	if (technique && context->stateTechnique != technique) {
-		context->stateTechnique = technique;
+	if (technique && gDevice.currentState->technique != technique) {
+		gDevice.currentState->technique = technique;
 		glUseProgram(technique->programId);
 	}
 
-	if (context->stateVertexLayout != technique->layout) {
+	if (gDevice.currentState->vertexLayout != technique->layout) {
 		/* force vertex buffer pointers to be set again */
-		context->stateVertexLayoutIsDirty = true;
-		context->stateVertexLayout = technique->layout;
+		gDevice.currentState->vertexLayoutIsDirty = true;
+		gDevice.currentState->vertexLayout = technique->layout;
 
 		/* activate or deactivate vertex attrib pointers */
 		const uint numActiveAttributes = technique->layout->numAttributes;
-		if (context->stateNumActiveAttributes != numActiveAttributes) {
-			uint min = min_uint(context->stateNumActiveAttributes, numActiveAttributes);
-			uint max = max_uint(context->stateNumActiveAttributes, numActiveAttributes);
+		if (gDevice.currentState->numActiveAttributes != numActiveAttributes) {
+			uint min = min_uint(gDevice.currentState->numActiveAttributes, numActiveAttributes);
+			uint max = max_uint(gDevice.currentState->numActiveAttributes, numActiveAttributes);
 			for (uint i = min; i < numActiveAttributes; ++i) {
 				glEnableVertexAttribArray(i);
 			}
@@ -532,31 +548,75 @@ void nuDeviceSetTechnique(NuContext context, NuTechnique const techniqueIndex)
 	}
 }
 
+void nuDeviceSetBlendState(NuContext context, NuBlendState const* blendState)
+{
+	static const GLenum nglBlendFuncs[] = {
+		GL_ZERO,
+		GL_ONE,
+		GL_SRC_COLOR,
+		GL_ONE_MINUS_SRC_COLOR,
+		GL_DST_COLOR,
+		GL_ONE_MINUS_DST_COLOR,
+		GL_SRC_ALPHA,
+		GL_ONE_MINUS_SRC_ALPHA,
+		GL_DST_ALPHA,
+		GL_ONE_MINUS_DST_ALPHA,
+		GL_CONSTANT_COLOR,
+		GL_ONE_MINUS_CONSTANT_COLOR,
+		GL_CONSTANT_ALPHA,
+		GL_ONE_MINUS_CONSTANT_ALPHA,
+		GL_SRC_ALPHA_SATURATE,
+		GL_SRC1_COLOR,
+		GL_ONE_MINUS_SRC1_COLOR,
+		GL_SRC1_ALPHA,
+		GL_ONE_MINUS_SRC1_ALPHA,
+	};
+
+	static const GLenum nglBlendEquats[] = {
+		GL_FUNC_ADD,
+		GL_FUNC_SUBTRACT,
+		GL_FUNC_REVERSE_SUBTRACT,
+		GL_MIN,
+		GL_MAX,
+	};
+
+	EnforceInitialized();
+	BindContext(context);
+
+	if (memcmp(&gDevice.currentState->blendState, blendState, sizeof *blendState)) {
+		gDevice.currentState->blendState = *blendState;
+		glBlendEquationSeparate(nglBlendEquats[blendState->rgbOp], nglBlendEquats[blendState->alphaOp]);
+		glBlendFuncSeparate(nglBlendFuncs[blendState->srcRgbFactor], nglBlendFuncs[blendState->dstRgbFactor], nglBlendFuncs[blendState->srcAlphaFactor], nglBlendFuncs[blendState->dstAlphaFactor]);
+	}
+}
+
 void nuDeviceSetVertexBuffers(NuContext context, uint base, uint count, NuBufferView const *views)
 {
 	EnforceInitialized();
-	nEnforce(context->stateTechnique && context->stateTechnique->layout, "A technique with a valid input layout must be set before setting vertex buffers.");
-	nGlContextMakeCurrent(&context->nglContext);
+	BindContext(context);
+	State* currentState = gDevice.currentState;
+
+	nEnforce(currentState->technique && currentState->technique->layout, "A technique with a valid input layout must be set before setting vertex buffers.");
 
 	for (uint i = 0; i < count; ++i) {
 		uint streamId = i + base;
 		const NuBufferView* view = &views[i];
 		const Buffer* buffer = view->buffer;
 
-		nEnforce(streamId < context->stateTechnique->layout->numStreams, "Stream too large for currently bound technique input layout.");
+		nEnforce(streamId < currentState->technique->layout->numStreams, "Stream too large for currently bound technique input layout.");
 
 		/* check cache first */
-		if (!context->stateVertexLayoutIsDirty &&
-			(context->stateVertexBuffers[streamId].buffer == buffer && context->stateVertexBuffers[streamId].offset == view->offset)) {
+		if (!currentState->vertexLayoutIsDirty &&
+			(currentState->vertexBuffers[streamId].buffer == buffer && currentState->vertexBuffers[streamId].offset == view->offset)) {
 			continue;
 		}
 
-		context->stateVertexBuffers[streamId] = *view;
+		currentState->vertexBuffers[streamId] = *view;
 
-		const VertexLayout *layout = context->stateTechnique->layout;
+		const VertexLayout *layout = currentState->technique->layout;
 		const VertexLayoutStream *stream = &layout->streams[streamId];
 
-		BindBuffer(context, buffer);
+		BindBuffer(buffer);
 
 		for (uint i = 0; i < stream->numAttributes; ++i) {
 			const VertexLayoutAttribute *attribute = &stream->attributes[i];
@@ -574,26 +634,27 @@ void nuDeviceSetVertexBuffers(NuContext context, uint base, uint count, NuBuffer
 				glVertexAttribPointer(attribute->location, attribute->dimension, gl_type, normalized, stream->stride, offset_ptr);
 			}
 
-			glVertexAttribDivisor(attribute->location, stream->instanced);
+			glVertexAttribDivisor(attribute->location, stream->instanced != 0);
 		}
 	}
 
-	context->stateVertexLayoutIsDirty = false;
+	currentState->vertexLayoutIsDirty = false;
 }
 
 void nuDeviceSetConstantBuffers(NuContext context, uint base, uint count, NuBufferView const *views)
 {
 	EnforceInitialized();
-	nGlContextMakeCurrent(&context->nglContext);
+	BindContext(context);
 
 	for (uint i = 0; i < count; ++i) {
 		uint index = i + base;
 		const NuBufferView* view = &views[index];
-		NuBufferView* cache = &context->stateConstantBuffers[index];
-
-		if (memcmp(&context->stateConstantBuffers[index], view, sizeof(NuBufferView)) != 0) {
-			glBindBufferRange(GL_UNIFORM_BUFFER, index, view->buffer->id, view->offset, view->size);
+		NuBufferView* cache = &gDevice.currentState->constantBuffers[index];
+		uint size = view->size ? view->size : view->buffer->size;
+		if (cache->buffer != view->buffer || cache->offset != view->offset || cache->size != size) {
+			glBindBufferRange(GL_UNIFORM_BUFFER, index, view->buffer->id, view->offset, size);
 			*cache = *view;
+			cache->size = size;
 		}
 	}
 }
@@ -601,12 +662,13 @@ void nuDeviceSetConstantBuffers(NuContext context, uint base, uint count, NuBuff
 void nuDeviceDrawArrays(NuContext context, NuPrimitiveType primitive, uint firstVertex, uint numVertices, uint numInstances)
 {
 	EnforceInitialized();
-	nEnforce(context->stateTechnique, "No valid technique bound to the device.");
-	nEnforce(context->stateVertexLayout, "No valid vertex layout bound to the device.");
-	nGlContextMakeCurrent(&context->nglContext);
+	BindContext(context);
 
-	if (context->stateVertexLayoutIsDirty) {
-		nuDeviceSetVertexBuffers(context, 0, context->stateNumActiveAttributes, context->stateVertexBuffers);
+	nEnforce(gDevice.currentState->technique, "No valid technique bound to the device.");
+	nEnforce(gDevice.currentState->vertexLayout, "No valid vertex layout bound to the device.");
+
+	if (gDevice.currentState->vertexLayoutIsDirty) {
+		nuDeviceSetVertexBuffers(context, 0, gDevice.currentState->numActiveAttributes, gDevice.currentState->vertexBuffers);
 	}
 
 	glDrawArraysInstanced(PrimitiveTypeToGl(primitive), firstVertex, numVertices, numInstances);
@@ -615,15 +677,16 @@ void nuDeviceDrawArrays(NuContext context, NuPrimitiveType primitive, uint first
 void nuDeviceDrawIndexed(NuContext context, NuPrimitiveType primitive, NuIndexBufferView indexBuffer, uint firstVertex, uint numIndices, uint numInstances, uint baseVertex)
 {
 	EnforceInitialized();
-	nGlContextMakeCurrent(&context->nglContext);
-	nEnforce(context->stateTechnique, "No valid technique bound to the device.");
-	nEnforce(context->stateVertexLayout, "No valid vertex layout bound to the device.");
+	BindContext(context);
 
-	if (context->stateVertexLayoutIsDirty) {
-		nuDeviceSetVertexBuffers(context, 0, context->stateNumActiveAttributes, context->stateVertexBuffers);
+	nEnforce(gDevice.currentState->technique, "No valid technique bound to the device.");
+	nEnforce(gDevice.currentState->vertexLayout, "No valid vertex layout bound to the device.");
+
+	if (gDevice.currentState->vertexLayoutIsDirty) {
+		nuDeviceSetVertexBuffers(context, 0, gDevice.currentState->numActiveAttributes, gDevice.currentState->vertexBuffers);
 	}
 
-	BindBuffer(context, indexBuffer.bufferView.buffer);
+	BindBuffer(indexBuffer.bufferView.buffer);
 
 	GLenum glIndexType = (GLenum[]) { GL_UNSIGNED_BYTE, GL_UNSIGNED_SHORT, GL_UNSIGNED_INT }[indexBuffer.indexType];
 	glDrawElementsInstancedBaseVertex(PrimitiveTypeToGl(primitive), numIndices, glIndexType, (const void*)(uintptr_t)indexBuffer.bufferView.offset, numInstances, baseVertex);

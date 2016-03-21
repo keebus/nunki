@@ -72,17 +72,56 @@ typedef enum {
 	NU_TECHNIQUE_CREATE_ERROR_LINK_FAILED,
 } NuTechniqueCreateResult;
 
-typedef struct {
-	NuBuffer buffer;
-	uint offset;
-	uint size; /* unused for vertex buffers */
-} NuBufferView;
-
 typedef enum {
 	NU_UNSIGNED_BYTE,
 	NU_UNSIGNED_SHORT,
 	NU_UNSIGNED_INT,
 } NuIndexType;
+
+typedef enum {
+	NU_BLEND_FACTOR_ZERO,
+	NU_BLEND_FACTOR_ONE,
+	NU_BLEND_FACTOR_SRC_COLOR,
+	NU_BLEND_FACTOR_ONE_MINUS_SRC_COLOR,
+	NU_BLEND_FACTOR_DST_COLOR,
+	NU_BLEND_FACTOR_ONE_MINUS_DST_COLOR,
+	NU_BLEND_FACTOR_SRC_ALPHA,
+	NU_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+	NU_BLEND_FACTOR_DST_ALPHA,
+	NU_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
+	NU_BLEND_FACTOR_CONSTANT_COLOR,
+	NU_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR,
+	NU_BLEND_FACTOR_CONSTANT_ALPHA,
+	NU_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA,
+	NU_BLEND_FACTOR_SRC_ALPHA_SATURATE,
+	NU_BLEND_FACTOR_SRC1_COLOR,
+	NU_BLEND_FACTOR_ONE_MINUS_SRC1_COLOR,
+	NU_BLEND_FACTOR_SRC1_ALPHA,
+	NU_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA,
+} NuBlendFactor;
+
+typedef enum {
+	NU_BLEND_FUNC_ADD,
+	NU_BLEND_FUNC_SUB,
+	NU_BLEND_FUNC_REVERSE_SUB,
+	NU_BLEND_FUNC_MIN,
+	NU_BLEND_FUNC_MAX,
+} NuBlendOp;
+
+typedef struct {
+	NuBlendFactor srcRgbFactor;
+	NuBlendFactor dstRgbFactor;
+	NuBlendOp     rgbOp;
+	NuBlendFactor srcAlphaFactor;
+	NuBlendFactor dstAlphaFactor;
+	NuBlendOp     alphaOp;
+} NuBlendState;
+
+typedef struct {
+	NuBuffer buffer;
+	uint offset;
+	uint size; /* unused for vertex buffers */
+} NuBufferView;
 
 typedef struct {
 	NuBufferView bufferView;
@@ -190,6 +229,11 @@ NUNKI_API void nuDeviceSetViewport(NuContext context, NuRect2i viewport);
  * Write the #documentation.
  */
 NUNKI_API void nuDeviceSetTechnique(NuContext context, NuTechnique const technique);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API void nuDeviceSetBlendState(NuContext context, NuBlendState const* blendState);
 
 /**
  * Write the #documentation.

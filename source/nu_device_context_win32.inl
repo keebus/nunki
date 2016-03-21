@@ -204,11 +204,11 @@ NuResult nInitGlContext(NGlContextManager* glCM, void* windowHandle, NGlContext*
 	}
 
 	///* reset the context to manager's */
-	//if (!MakeCurrent(glCM->hDC, glCM->context)) {
-	//	nDebugError("Could not restore context manager GL context.");
-	//	nDeinitGlContext(glCM, context);
-	//	return NU_FAILURE;
-	//}
+	if (!MakeCurrent(glCM->hDC, glCM->context)) {
+		nDebugError("Could not restore context manager GL context.");
+		nDeinitGlContext(glCM, context);
+		return NU_FAILURE;
+	}
 
 	return NU_SUCCESS;
 }
@@ -222,7 +222,7 @@ void nDeinitGlContext(NGlContextManager* glCM, NGlContext* context)
 
 void nGlContextMakeCurrent(NGlContext* context)
 {
-	//MakeCurrent(context->hdc, context->hglrc);
+	MakeCurrent(context->hdc, context->hglrc);
 }
 
 void nGlContextSwapBuffers(NGlContext* context)
