@@ -161,6 +161,7 @@ void  nArrayFree(void* array, NuAllocator* allocator);
 void  nArrayClear(void* array);
 uint  nArrayLen(void* array);
 
+#define nArrayReserve(parray, allocator, type, capacity) nArrayReserveEx(parray, allocator, sizeof(type), capacity)
 #define nArrayPush(parray, allocator, type) (type*)nArrayPushEx(parray, allocator, sizeof(type), 1)
 #define nArrayPushN(parray, allocator, type, N) (type*)nArrayPushEx(parray, allocator, sizeof(type), N)
 

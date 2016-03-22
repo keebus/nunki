@@ -32,8 +32,12 @@ int main()
 	NuContext context;
 	nuCreateContext(&contextInfo, NULL, &context);
 
+	NuScene2DCreateInfo sceneInfo = {
+		.isImmediate = true,
+	};
+
 	NuScene2D scene;
-	nuCreateScene2D(NULL, &scene);
+	nuCreateScene2D(&sceneInfo, NULL, &scene);
 
 	NuBlendState alphaBlendState = {
 		.srcRgbFactor = NU_BLEND_FACTOR_SRC_ALPHA,
@@ -64,6 +68,13 @@ int main()
 
 		nu2dSetBlendState(scene, &alphaBlendState);
 		nu2dDrawQuadSolidFlat(scene, (NuRect2){ 10, 10, 100, 100 }, 0xff0000ff);
+		nu2dDrawQuadSolidFlat(scene, (NuRect2){ 20, 20, 100, 100 }, 0xffff00ff);
+		nu2dDrawQuadSolidFlat(scene, (NuRect2){ 30, 30, 100, 100 }, 0xffffff99);
+
+		nu2dSetBlendState(scene, &alphaBlendState);
+		nu2dDrawQuadSolidFlat(scene, (NuRect2) { 100, 100, 100, 100 }, 0xff0000ff);
+		nu2dDrawQuadSolidFlat(scene, (NuRect2) { 120, 120, 100, 100 }, 0xffff00ff);
+		nu2dDrawQuadSolidFlat(scene, (NuRect2) { 130, 130, 100, 100 }, 0xffffff99);
 
 		nu2dPresent(scene);
 

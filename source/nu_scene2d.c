@@ -42,6 +42,7 @@ typedef struct {
 
 typedef struct NuScene2DImpl {
 	NuAllocator        allocator;
+	bool               isImmediate;
 	NuScene2DResetInfo beginInfo;
 	Command*           commands;
 	char*              instanceData;
@@ -88,20 +89,90 @@ static inline PrimitiveInfo GetPrimitiveInfo(PrimitiveType type)
 	return (PrimitiveInfo) { 0 };
 }
 
-/* State functions */
-static Command* SetStateChangeDeviceState(NuScene2D scene, CommandType cmdType)
+static inline void BeginSceneRendering(Scene2D* scene)
 {
-	/* fetch last command and check whether it matches command type */
+	NuContext context = scene->beginInfo.context;
+
+	/* update the constant buffer */
+	Constants constants;
+	NuRect2i  viewport = scene->beginInfo.bounds;
+	nOrtho((float)viewport.position.x,
+		(float)viewport.position.y,
+		(float)viewport.position.x + viewport.size.width,
+		(float)viewport.position.y + viewport.size.height,
+		0.f, 1.f, constants.transform);
+
+	nuBufferUpdate(gScene2D.constantBuffer, 0, &constants, sizeof constants);
+
+	nuDeviceSetConstantBuffers(context, 0, 1, (NuBufferView[]) {
+		gScene2D.constantBuffer, 0, 0
+	});
+
+	/* set device viewport */
+	nuDeviceSetViewport(context, viewport);
+}
+
+static inline void ExecuteCommand(Scene2D* scene, Command* command)
+{
+	NuContext context = scene->beginInfo.context;
+	switch (command->type) {
+		case CMD_SET_BLEND_STATE:
+		{
+			nuDeviceSetBlendState(context, &command->blendState);
+			break;
+		}
+
+		case CMD_DRAW:
+		{
+			CommandDraw* draw = &command->draw;
+			PrimitiveInfo primitiveInfo = GetPrimitiveInfo(draw->primitiveType);
+
+			/* set device state */
+			nuDeviceSetTechnique(context, primitiveInfo.technique);
+
+			nuDeviceSetVertexBuffers(context, 0, 2, (NuBufferView[]) {
+				gScene2D.primitivesVertexBuffer, primitiveInfo.primitiveVertexOffset, 0,
+					gScene2D.instancesVertexBuffer, draw->firstInstanceOffset, 0,
+			});
+
+			/* issue draw */
+			nuDeviceDrawArrays(context, primitiveInfo.devicePrimitiveType, 0, 4, draw->instanceCount);
+			break;
+		}
+	}
+}
+
+static inline Command* GetLastCommand(Scene2D* scene)
+{
 	uint numCommands = nArrayLen(scene->commands);
-	Command *command = NULL;
+	Command* command = NULL;
 
 	if (numCommands > 0) {
 		command = &scene->commands[numCommands - 1];
+		if (scene->isImmediate) {
 
-		/* check command state matches quad drawing command */
-		if (command->type != cmdType) {
-			command = NULL;
+			/* update the instance buffer and clear it */
+			nuBufferUpdate(gScene2D.instancesVertexBuffer, 0, scene->instanceData, nArrayLen(scene->instanceData));
+			nArrayClear(scene->instanceData);
+
+			ExecuteCommand(scene, command);
+			nArrayClear(scene->commands);
+			return NULL;
 		}
+	}
+
+	return command;
+}
+
+/* State functions */
+static Command* SetStateChangeDeviceState(Scene2D* scene, CommandType cmdType)
+{
+	/* fetch last command and check whether it matches command type */
+	Command *command = GetLastCommand(scene);
+
+	/* check command state matches quad drawing command */
+	if (command && command->type != cmdType) {
+		command = NULL;
 	}
 
 	/* if last command is not appropriate or there simply are no commands in scene yet make one */
@@ -118,20 +189,15 @@ static Command* SetStateChangeDeviceState(NuScene2D scene, CommandType cmdType)
 static Command* SetStateQuadSolid(NuScene2D scene)
 {
 	/* fetch last command and make sure it matches quads rendering */
-	uint numCommands = nArrayLen(scene->commands);
-	Command *command = NULL;
+	Command *command = GetLastCommand(scene);
 
-	if (numCommands > 0) {
-		command = &scene->commands[numCommands - 1];
-
-		/* check command state matches quad drawing command */
-		if (command->type != CMD_DRAW || command->draw.primitiveType != PRIMITIVE_SOLID_QUAD) {
-			command = NULL;
-		}
+	/* check command state matches quad drawing command */
+	if (command && (command->type != CMD_DRAW || command->draw.primitiveType != PRIMITIVE_SOLID_QUAD)) {
+		command = NULL;
 	}
 
 	/* if last command is not appropriate or there simply are no commands in scene yet make one */
-	if (command == NULL) {
+	if (!command) {
 		nArrayAlignUp(&scene->instanceData, &scene->allocator, n_alignof(SolidQuad));
 		
 		command = nArrayPush(&scene->commands, &scene->allocator, Command);
@@ -222,12 +288,15 @@ void nDeinitScene2D(NuAllocator* allocator)
 /*-------------------------------------------------------------------------------------------------
  * Public API
  *-----------------------------------------------------------------------------------------------*/
-NuResult nuCreateScene2D(NuAllocator* allocator, NuScene2D* scene)
+NuResult nuCreateScene2D(NuScene2DCreateInfo const* info, NuAllocator* allocator, NuScene2D* ppScene)
 {
 	allocator = nGetAllocator(allocator);
-	*scene = nNew(Scene2D, allocator);
-	if (!*scene) return NU_ERROR_OUT_OF_MEMORY;
-	(*scene)->allocator = *allocator;
+	*ppScene = nNew(Scene2D, allocator);
+	Scene2D* scene = *ppScene;
+	if (!scene) return NU_ERROR_OUT_OF_MEMORY;
+	scene->allocator = *allocator;
+	scene->isImmediate = info->isImmediate;
+	nArrayReserve(&scene->commands, allocator, Command, info->isImmediate ? 1 : 10);
 	return NU_SUCCESS;
 }
 
@@ -243,6 +312,9 @@ NuResult nu2dReset(NuScene2D scene, NuScene2DResetInfo const* info)
 	scene->beginInfo = *info;
 	nArrayClear(scene->commands);
 	nArrayClear(scene->instanceData);
+	if (scene->isImmediate) {
+		BeginSceneRendering(scene);
+	}
 	return NU_SUCCESS;
 }
 
@@ -251,58 +323,15 @@ void nu2dPresent(NuScene2D scene)
 	uint numCommands = nArrayLen(scene->commands);
 	if (numCommands == 0) return;
 
-	NuContext context = scene->beginInfo.context;
-
-	/* update the constant buffer */
-	Constants constants;
-	NuRect2i  viewport = scene->beginInfo.bounds;
-	nOrtho((float)viewport.position.x,
-		(float)viewport.position.y,
-		(float)viewport.position.x + viewport.size.width,
-		(float)viewport.position.y + viewport.size.height,
-		0.f, 1.f, constants.transform);
-	
-	nuBufferUpdate(gScene2D.constantBuffer, 0, &constants, sizeof constants);
-
-	nuDeviceSetConstantBuffers(context, 0, 1, (NuBufferView[]) {
-		gScene2D.constantBuffer, 0, 0
-	});
-
-	/* set device viewport */
-	nuDeviceSetViewport(context, viewport);
-
 	/* update the instance buffer */
 	nuBufferUpdate(gScene2D.instancesVertexBuffer, 0, scene->instanceData, nArrayLen(scene->instanceData));
 
+	if (!scene->isImmediate) {
+		BeginSceneRendering(scene);
+	}
+
 	for (uint i = 0; i < numCommands; ++i) {
-		Command* command = &scene->commands[i];
-
-		switch (command->type) {
-			case CMD_SET_BLEND_STATE:
-			{
-				nuDeviceSetBlendState(context, &command->blendState);
-				break;
-			}
-
-			case CMD_DRAW:
-			{
-				CommandDraw* draw = &command->draw;
-				PrimitiveInfo primitiveInfo = GetPrimitiveInfo(draw->primitiveType);
-
-				/* set device state */
-				nuDeviceSetTechnique(context, primitiveInfo.technique);
-
-				nuDeviceSetVertexBuffers(context, 0, 2, (NuBufferView[]) {
-					gScene2D.primitivesVertexBuffer, primitiveInfo.primitiveVertexOffset, 0,
-						gScene2D.instancesVertexBuffer, draw->firstInstanceOffset, 0,
-				});
-
-				/* issue draw */
-				nuDeviceDrawArrays(context, primitiveInfo.devicePrimitiveType, 0, 4, draw->instanceCount);
-				break;
-			}
-		}
-	
+		ExecuteCommand(scene, scene->commands + i);
 	}
 }
 

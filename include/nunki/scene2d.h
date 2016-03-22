@@ -12,16 +12,19 @@
 NU_HANDLE(NuScene2D);
 
 typedef struct {
+	uint isImmediate : 1;
+} NuScene2DCreateInfo;
+
+typedef struct {
 	NuContext context;
 	NuRect2i  bounds;
 	uint      enableScissors : 1;
 } NuScene2DResetInfo;
 
-
 /**
  * Write the #documentation.
  */
-NUNKI_API NuResult nuCreateScene2D(NuAllocator* allocator, NuScene2D* scene);
+NUNKI_API NuResult nuCreateScene2D(NuScene2DCreateInfo const* info, NuAllocator* allocator, NuScene2D* scene);
 
 /**
  * Write the #documentation.
