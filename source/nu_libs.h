@@ -155,7 +155,7 @@ inline uint nSwizzleUInt(uint ui)
 /*-------------------------------------------------------------------------------------------------
  * array
  *-----------------------------------------------------------------------------------------------*/
-void  nArrayReserveEx(void** parray, NuAllocator* allocator, uint elementSize, uint capacity);
+bool nArrayReserveEx(void** parray, NuAllocator* allocator, uint elementSize, uint capacity);
 void* nArrayPushEx(void** parray, NuAllocator* allocator, uint elementSize, uint count);
 void  nArrayFree(void* array, NuAllocator* allocator);
 void  nArrayClear(void* array);
@@ -168,4 +168,4 @@ uint  nArrayLen(void* array);
 /**
  * Write the #documentation.
  */
-void nArrayAlignUp(void** parray, NuAllocator* allocator, uint alignment);
+bool nArrayAlignUp(void** parray, NuAllocator* allocator, uint alignment);

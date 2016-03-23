@@ -170,6 +170,12 @@ typedef struct {
 	void* windowHandle;
 } NuContextCreateInfo;
 
+typedef struct {
+	NuBlendState defaultBlendState;
+	NuBlendState additiveBlendState;
+	NuBlendState alphaBlendState;
+} NuDeviceDefaultStates;
+
 /**
  * Write the #documentation.
  */
@@ -209,11 +215,6 @@ NUNKI_API NuResult nuCreateContext(NuContextCreateInfo const* info, NuAllocator*
  * Write the #documentation.
  */
 NUNKI_API void nuDestroyContext(NuContext context, NuAllocator* allocator);
-
-/**
- * Write the #documentation.
- */
-// NUNKI_API NuViewport nuGetContextViewport(NuContext handle)
 
 /**
  * Write the #documentation.
@@ -259,3 +260,8 @@ NUNKI_API void nuDeviceDrawIndexed(NuContext context, NuPrimitiveType primitive,
  * Write the #documentation.
  */
 NUNKI_API void nuDeviceSwapBuffers(NuContext context);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuDeviceDefaultStates const* nuDeviceGetDefaultStates(void);

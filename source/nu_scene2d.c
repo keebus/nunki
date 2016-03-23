@@ -12,59 +12,66 @@
 /*-------------------------------------------------------------------------------------------------
  * Types
  *-----------------------------------------------------------------------------------------------*/
+
+/* Instance types */
 typedef struct {
 	NuRect2 rect;
 	uint    color;
 } SolidQuad;
 
 typedef enum {
-	CMD_SET_BLEND_STATE,
-	CMD_DRAW,
-} CommandType;
+	MESH_TYPE_SOLID_QUAD
+} MeshType;
 
-typedef enum {
-	PRIMITIVE_SOLID_QUAD
-} PrimitiveType;
+static const uint kMeshInstanceSize[] = {
+	sizeof(SolidQuad),
+};
+
+static const NuPrimitiveType kMeshPrimitiveType[] = {
+	NU_PRIMITIVE_TRIANGLE_STRIP,
+};
+
+static const char* kMeshTypeStr[] = {
+	"solid quad",
+};
 
 typedef struct {
-	PrimitiveType primitiveType;
+	MeshType     meshType;
+	NuTechnique  technique;
+	NuBlendState blendState;
+} DeviceState;
+
+typedef struct {
+	DeviceState deviceState;
 	uint firstInstanceOffset;
 	uint instanceCount;
-} CommandDraw;
-
-typedef struct {
-	CommandType type;
-	union {
-		CommandDraw draw;
-		NuBlendState blendState;
-	};
 } Command;
-
-typedef struct NuScene2DImpl {
-	NuAllocator        allocator;
-	bool               isImmediate;
-	NuScene2DResetInfo beginInfo;
-	Command*           commands;
-	char*              instanceData;
-} Scene2D;
-
-typedef struct {
-	NuTechnique technique;
-	uint primitiveVertexOffset;
-	uint instanceSize;
-	NuPrimitiveType devicePrimitiveType;
-} PrimitiveInfo;
 
 typedef struct {
 	float transform[16];
 } Constants;
 
+typedef struct NuScene2DImpl {
+	NuAllocator        allocator;
+	NuRect2i           viewport;
+	Command*           commands;
+	char*              instanceData;
+} Scene2D;
+
 static struct {
 	bool initialized;
-	uint primitiveVertexBufferOffsetToQuad;
+	NuAllocator allocator;
+	uint quadMeshVertexBufferOffset;
 	NuBuffer constantBuffer;
 	NuBuffer primitivesVertexBuffer;
 	NuBuffer instancesVertexBuffer;
+
+	/* immediate context */
+	NuContext immediateContext;
+	NuRect2i  immediateViewport;
+	bool      immediateHasCommand;
+	Command   immediateCommand;
+	char*     immediateInstanceData;
 } gScene2D;
 
 /*-------------------------------------------------------------------------------------------------
@@ -72,30 +79,13 @@ static struct {
  *-----------------------------------------------------------------------------------------------*/
 #define EnforceInitialized() nEnforce(gScene2D.initialized, "Scene 2D module uninitialized.");
 
-inline void PushVec2( float **v, NuAllocator* allocator, float x, float y)
+/**
+ * Sets the device state so that draw commands can be issued.
+ */
+static void SetDeviceViewport(NuContext context, NuRect2i viewport)
 {
-	float *p = nArrayPushN(v, allocator, float, 2);
-	p[0] = x;
-	p[1] = y;
-}
-
-static inline PrimitiveInfo GetPrimitiveInfo(PrimitiveType type)
-{
-	switch (type) {
-		case PRIMITIVE_SOLID_QUAD:
-			return (PrimitiveInfo) { nGetBuiltins()->techniqueSolidQuad2D, gScene2D.primitiveVertexBufferOffsetToQuad, sizeof(SolidQuad), NU_PRIMITIVE_TRIANGLE_STRIP };
-	}
-	nAssert(false);
-	return (PrimitiveInfo) { 0 };
-}
-
-static inline void BeginSceneRendering(Scene2D* scene)
-{
-	NuContext context = scene->beginInfo.context;
-
 	/* update the constant buffer */
 	Constants constants;
-	NuRect2i  viewport = scene->beginInfo.bounds;
 	nOrtho((float)viewport.position.x,
 		(float)viewport.position.y,
 		(float)viewport.position.x + viewport.size.width,
@@ -112,105 +102,105 @@ static inline void BeginSceneRendering(Scene2D* scene)
 	nuDeviceSetViewport(context, viewport);
 }
 
-static inline void ExecuteCommand(Scene2D* scene, Command* command)
+/**
+ * Executes a single draw command.
+ */
+static void ExecuteCommand(Command* command, NuContext context)
 {
-	NuContext context = scene->beginInfo.context;
-	switch (command->type) {
-		case CMD_SET_BLEND_STATE:
-		{
-			nuDeviceSetBlendState(context, &command->blendState);
-			break;
-		}
+	DeviceState* state = &command->deviceState;
+	
+	nuDeviceSetBlendState(context, &state->blendState);
 
-		case CMD_DRAW:
-		{
-			CommandDraw* draw = &command->draw;
-			PrimitiveInfo primitiveInfo = GetPrimitiveInfo(draw->primitiveType);
+	/* set device state */
+	nuDeviceSetTechnique(context, state->technique);
 
-			/* set device state */
-			nuDeviceSetTechnique(context, primitiveInfo.technique);
+	uint primitiveVertexOffset = (uint[]) {
+		gScene2D.quadMeshVertexBufferOffset,
+	}[state->meshType];
 
-			nuDeviceSetVertexBuffers(context, 0, 2, (NuBufferView[]) {
-				gScene2D.primitivesVertexBuffer, primitiveInfo.primitiveVertexOffset, 0,
-					gScene2D.instancesVertexBuffer, draw->firstInstanceOffset, 0,
-			});
+	nuDeviceSetVertexBuffers(context, 0, 2, (NuBufferView[]) {
+		gScene2D.primitivesVertexBuffer, primitiveVertexOffset, 0,
+		gScene2D.instancesVertexBuffer, command->firstInstanceOffset, 0,
+	});
 
-			/* issue draw */
-			nuDeviceDrawArrays(context, primitiveInfo.devicePrimitiveType, 0, 4, draw->instanceCount);
-			break;
-		}
-	}
+	/* issue draw */
+	nuDeviceDrawArrays(context, kMeshPrimitiveType[state->meshType], 0, 4, command->instanceCount);
 }
 
-static inline Command* GetLastCommand(Scene2D* scene)
+static void ExecuteImmediateCommand(Command* command, NuContext context)
 {
-	uint numCommands = nArrayLen(scene->commands);
+	nuBufferUpdate(gScene2D.instancesVertexBuffer, 0, gScene2D.immediateInstanceData, nArrayLen(gScene2D.immediateInstanceData));
+	ExecuteCommand(command, context);
+	nArrayClear(&gScene2D.immediateInstanceData);
+	gScene2D.immediateHasCommand = false;
+}
+
+/**
+ * Executes a single draw command.
+ */
+static Command* NewCommand(Scene2D* scene, DeviceState const* deviceState)
+{
+	EnforceInitialized();
 	Command* command = NULL;
+	char** instanceData;
+	NuAllocator* allocator;
 
-	if (numCommands > 0) {
-		command = &scene->commands[numCommands - 1];
-		if (scene->isImmediate) {
-
-			/* update the instance buffer and clear it */
-			nuBufferUpdate(gScene2D.instancesVertexBuffer, 0, scene->instanceData, nArrayLen(scene->instanceData));
-			nArrayClear(scene->instanceData);
-
-			ExecuteCommand(scene, command);
-			nArrayClear(scene->commands);
-			return NULL;
+	if (scene) {
+		uint n = nArrayLen(scene->commands);
+		if (n > 0 && memcmp(&scene->commands[n - 1].deviceState, deviceState, sizeof(DeviceState)) == 0) {
+			return &scene->commands[n - 1];
 		}
+		command = nArrayPush(&scene->commands, &scene->allocator, Command);
+		if (!command) return NULL;
+
+		allocator = &scene->allocator;
+		instanceData = &scene->instanceData;		
 	}
+	/* if null, user asks for immediate mode scene */
+	else {
+		/* if different commands, we need to flush the current one before continuing */
+		if (gScene2D.immediateHasCommand && memcmp(&gScene2D.immediateCommand.deviceState, deviceState, sizeof(DeviceState)) != 0) {
+			ExecuteImmediateCommand(&gScene2D.immediateCommand, gScene2D.immediateContext);
+		}
+		gScene2D.immediateHasCommand = true;
+		command = &gScene2D.immediateCommand;
+		allocator = &gScene2D.allocator;
+		instanceData = &gScene2D.immediateInstanceData;
+	}
+
+	nAssert(command);
+	command->deviceState = *deviceState;
+
+	if (!nArrayAlignUp(instanceData, allocator, n_alignof(float))) {
+		return NULL;
+	}
+
+	command->firstInstanceOffset = nArrayLen(*instanceData);
+	command->instanceCount = 0;
 
 	return command;
 }
 
-/* State functions */
-static Command* SetStateChangeDeviceState(Scene2D* scene, CommandType cmdType)
+static inline void* NewInstance(NuScene2D scene, MeshType checkMeshType)
 {
-	/* fetch last command and check whether it matches command type */
-	Command *command = GetLastCommand(scene);
-
-	/* check command state matches quad drawing command */
-	if (command && command->type != cmdType) {
-		command = NULL;
+	EnforceInitialized();
+	Command* command = NULL;
+	void* instance = NULL;
+	if (scene) {
+		uint n = nArrayLen(scene->commands);
+		nEnforce(n > 0, "No command given for specified Scene2D, you possibly forgot a nu2dBegin*() call?");
+		command = &scene->commands[n - 1];
+		instance = nArrayPushEx(&scene->instanceData, &scene->allocator, 1, kMeshInstanceSize[checkMeshType]);
 	}
-
-	/* if last command is not appropriate or there simply are no commands in scene yet make one */
-	if (command == NULL) {
-		command = nArrayPush(&scene->commands, &scene->allocator, Command);
-		*command = (Command) {
-			.type = cmdType,
-		};
+	else {
+		nEnforce(gScene2D.immediateHasCommand, "No command given for immediate Scene2D, you possibly forgot a nu2dBegin*() call?");
+		command = &gScene2D.immediateCommand;
+		instance = nArrayPushEx(&gScene2D.immediateInstanceData, &gScene2D.allocator, 1, kMeshInstanceSize[checkMeshType]);
 	}
-
-	return command;
-}
-
-static Command* SetStateQuadSolid(NuScene2D scene)
-{
-	/* fetch last command and make sure it matches quads rendering */
-	Command *command = GetLastCommand(scene);
-
-	/* check command state matches quad drawing command */
-	if (command && (command->type != CMD_DRAW || command->draw.primitiveType != PRIMITIVE_SOLID_QUAD)) {
-		command = NULL;
-	}
-
-	/* if last command is not appropriate or there simply are no commands in scene yet make one */
-	if (!command) {
-		nArrayAlignUp(&scene->instanceData, &scene->allocator, n_alignof(SolidQuad));
-		
-		command = nArrayPush(&scene->commands, &scene->allocator, Command);
-		*command = (Command) {
-			.type = CMD_DRAW,
-			.draw = (CommandDraw) {
-				.primitiveType = PRIMITIVE_SOLID_QUAD,
-				.firstInstanceOffset = nArrayLen(scene->instanceData),
-			}
-		};
-	}
-
-	return command;
+	nEnforce(command->deviceState.meshType == checkMeshType, "Instance 2D pushed on scene not in the correct draw state, current is '%s', instance pushed for draw state '%s'.",
+		kMeshTypeStr[command->deviceState.meshType], kMeshTypeStr[checkMeshType]);
+	++command->instanceCount;
+	return instance;
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -218,18 +208,28 @@ static Command* SetStateQuadSolid(NuScene2D scene)
  *-----------------------------------------------------------------------------------------------*/
 NuResult nInitScene2D(NuAllocator* allocator)
 {
+	#define PushVec2(v, allocator, x, y)\
+	{\
+		float *p = nArrayPushN(v, allocator, float, 2);\
+		p[0] = x;\
+		p[1] = y;\
+	}
+
 	nAssert(!gScene2D.initialized);
 	gScene2D.initialized = true;
+	gScene2D.allocator = *allocator;
 
 	/* prepare the primitive template vertex buffer */
 	float *data = NULL;
 
 	/* quad */
-	gScene2D.primitiveVertexBufferOffsetToQuad = 0;
+	gScene2D.quadMeshVertexBufferOffset = 0;
 	PushVec2(&data, allocator, 0, 0);
 	PushVec2(&data, allocator, 1, 0);
 	PushVec2(&data, allocator, 0, 1);
 	PushVec2(&data, allocator, 1, 1);
+
+	#undef PushVec2
 
 	/* create the primitives vertex buffer */
 	NuBufferCreateInfo bufferInfo = {
@@ -280,6 +280,7 @@ error:
 void nDeinitScene2D(NuAllocator* allocator)
 {
 	if (!gScene2D.initialized) return;
+	nArrayFree(gScene2D.immediateInstanceData, &gScene2D.allocator);
 	nuDestroyBuffer(gScene2D.primitivesVertexBuffer, allocator);
 	nuDestroyBuffer(gScene2D.instancesVertexBuffer, allocator);
 	nZero(&gScene2D);
@@ -288,67 +289,116 @@ void nDeinitScene2D(NuAllocator* allocator)
 /*-------------------------------------------------------------------------------------------------
  * Public API
  *-----------------------------------------------------------------------------------------------*/
-NuResult nuCreateScene2D(NuScene2DCreateInfo const* info, NuAllocator* allocator, NuScene2D* ppScene)
+void nu2dImmediateBegin(Nu2dBeginImmediateInfo const* info)
 {
+	EnforceInitialized();
+	nEnforce(!gScene2D.immediateHasCommand, "Immediate 2D rendering already begun.");
+	gScene2D.immediateContext  = info->context;
+	gScene2D.immediateViewport = info->viewport;
+	SetDeviceViewport(info->context, info->viewport);
+}
+
+void nu2dImmediateEnd(void)
+{
+	EnforceInitialized();
+	if (gScene2D.immediateHasCommand) {
+		ExecuteImmediateCommand(&gScene2D.immediateCommand, gScene2D.immediateContext);
+	}
+	nArrayClear(gScene2D.immediateInstanceData);
+}
+
+NuResult nuCreateScene2D(NuAllocator* allocator, NuScene2D* ppScene)
+{
+	EnforceInitialized();
 	allocator = nGetAllocator(allocator);
 	*ppScene = nNew(Scene2D, allocator);
 	Scene2D* scene = *ppScene;
 	if (!scene) return NU_ERROR_OUT_OF_MEMORY;
 	scene->allocator = *allocator;
-	scene->isImmediate = info->isImmediate;
-	nArrayReserve(&scene->commands, allocator, Command, info->isImmediate ? 1 : 10);
+	nArrayReserve(&scene->commands, allocator, Command, 10);
 	return NU_SUCCESS;
 }
 
 void nuDestroyScene2D(NuScene2D scene, NuAllocator* allocator)
 {
+	EnforceInitialized();
+	allocator = nGetAllocator(allocator);
 	nArrayFree(scene->commands, allocator);
 	nArrayFree(scene->instanceData, allocator);
 	nFree(scene, nGetAllocator(allocator));
 }
 
-NuResult nu2dReset(NuScene2D scene, NuScene2DResetInfo const* info)
+NuResult nu2dReset(NuScene2D scene, NuRect2i viewport)
 {
-	scene->beginInfo = *info;
+	EnforceInitialized();
+	scene->viewport = viewport;
 	nArrayClear(scene->commands);
 	nArrayClear(scene->instanceData);
-	if (scene->isImmediate) {
-		BeginSceneRendering(scene);
-	}
 	return NU_SUCCESS;
 }
 
-void nu2dPresent(NuScene2D scene)
+void nu2dPresent(NuScene2D scene, NuContext context)
 {
+	EnforceInitialized();
 	uint numCommands = nArrayLen(scene->commands);
 	if (numCommands == 0) return;
+
+	SetDeviceViewport(context, scene->viewport);
 
 	/* update the instance buffer */
 	nuBufferUpdate(gScene2D.instancesVertexBuffer, 0, scene->instanceData, nArrayLen(scene->instanceData));
 
-	if (!scene->isImmediate) {
-		BeginSceneRendering(scene);
-	}
-
 	for (uint i = 0; i < numCommands; ++i) {
-		ExecuteCommand(scene, scene->commands + i);
+		ExecuteCommand(scene->commands + i, context);
 	}
 }
 
-void nu2dSetBlendState(NuScene2D scene, NuBlendState const* blendState)
+NuResult nu2dBeginQuadsSolid(NuScene2D scene, NuBlendState const* blendState)
 {
-	Command* command = SetStateChangeDeviceState(scene, CMD_SET_BLEND_STATE);
-	command->blendState = *blendState;
+	DeviceState state = {
+		.meshType = MESH_TYPE_SOLID_QUAD,
+		.technique = nGetBuiltins()->techniqueSolidQuad2D,
+		.blendState = *blendState,
+	};
+
+	Command* command = NewCommand(scene, &state);
+	return command ? NU_SUCCESS : NU_ERROR_OUT_OF_MEMORY;
 }
 
-void nu2dDrawQuadSolidFlat(NuScene2D scene, NuRect2 rect, uint32_t color)
+NuResult nu2dBeginQuadsTextured(NuScene2D scene, NuBlendState const* blendState)
 {
-	/* #todo add culling here.  */
+	EnforceInitialized();
+	nEnforce(false, "Unimplemented.");
+	return 0;
+}
 
-	Command* command = SetStateQuadSolid(scene);
+NuResult nu2dQuadSolid(NuScene2D scene, NuRect2 rect, uint32_t color)
+{
+	SolidQuad* quad = NewInstance(scene, MESH_TYPE_SOLID_QUAD);
+	if (!quad) {
+		return NU_ERROR_OUT_OF_MEMORY;
+	}
+	*quad = (SolidQuad) { rect, nSwizzleUInt(color) };
+	return NU_SUCCESS;
+}
 
-	/* push the quad instance */
-	++command->draw.instanceCount;
-	SolidQuad *instance = nArrayPushEx(&scene->instanceData, &scene->allocator, 1, sizeof(SolidQuad));
-	*instance = (SolidQuad) { rect, nSwizzleUInt(color) };
+NuResult nu2dQuadSolidEx(NuScene2D scene, NuRect2 rect, uint32_t topLeftColor, uint32_t topRightColor, uint32_t bottomLeftColor, uint32_t bottomRightColor)
+{
+	EnforceInitialized();
+	nEnforce(false, "Unimplemented.");
+	return 0;
+}
+
+NuResult nu2dQuadTextured(NuScene2D scene, NuRect2 rect, uint32_t color, uint32_t bottomRightColor)
+{
+	EnforceInitialized();
+	nEnforce(false, "Unimplemented.");
+	return 0;
+}
+
+NuResult nu2dQuadTexturedEx(NuScene2D scene, NuRect2 rect, uint32_t topLeftColor, uint32_t topRightColor, uint32_t bottomLeftColor, uint32_t bottomRightColor, NuRect2 uvRect, uint textureIndex)
+{
+	EnforceInitialized();
+	nEnforce(false, "Unimplemented.");
+	return 0;
 }

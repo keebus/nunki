@@ -696,3 +696,27 @@ void nuDeviceSwapBuffers(NuContext context)
 {
 	nGlContextSwapBuffers(&context->nglContext);
 }
+
+NuDeviceDefaultStates const* nuDeviceGetDefaultStates(void)
+{
+	static const NuDeviceDefaultStates states = {
+		.defaultBlendState = { 0 },
+		.additiveBlendState = {
+			.srcRgbFactor = NU_BLEND_FACTOR_ONE,
+			.dstRgbFactor = NU_BLEND_FACTOR_ONE,
+			.rgbOp = NU_BLEND_FUNC_ADD,
+			.srcAlphaFactor = NU_BLEND_FACTOR_ONE,
+			.dstAlphaFactor = NU_BLEND_FACTOR_ONE,
+			.alphaOp = NU_BLEND_FUNC_ADD,
+		},
+		.alphaBlendState = {
+			.srcRgbFactor = NU_BLEND_FACTOR_SRC_ALPHA,
+			.dstRgbFactor = NU_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+			.rgbOp = NU_BLEND_FUNC_ADD,
+			.srcAlphaFactor = NU_BLEND_FACTOR_ONE,
+			.dstAlphaFactor = NU_BLEND_FACTOR_ZERO,
+			.alphaOp = NU_BLEND_FUNC_ADD,
+		},
+	};
+	return &states;
+}

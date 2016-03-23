@@ -77,8 +77,7 @@ static inline ArrayHeader* getArrayHeader(void* array)
 {
 	return nAlignPtrDown((ArrayHeader*)array - 1, n_alignof(void*));
 }
-
-void nArrayReserveEx(void** parray, NuAllocator* allocator, uint elementSize, uint capacity)
+bool nArrayReserveEx(void** parray, NuAllocator* allocator, uint elementSize, uint capacity)
 {
 	ArrayHeader* header = getArrayHeader(*parray);
 
@@ -98,20 +97,24 @@ void nArrayReserveEx(void** parray, NuAllocator* allocator, uint elementSize, ui
 		totalSize -= n_alignof(void*); // remove max alignment
 
 		/* allocate the new array and copy the data over */
-		ArrayHeader* new_array_header = nMalloc(totalSize, allocator);
-		void* new_array = (char*)new_array_header + dataOffset;
+		ArrayHeader* newArrayHeader = nMalloc(totalSize, allocator);
+		if (!newArrayHeader) return false;
+
+		void* new_array = (char*)newArrayHeader + dataOffset;
 
 		if (*parray) {
 			memcpy(new_array, *parray, elementSize * oldLength);
 			nFree(header, allocator);
 		}
 
-		header = new_array_header;
+		header = newArrayHeader;
 		header->capacity = newCapacity;
 		header->length = oldLength;
 
 		*parray = new_array;
 	}
+
+	return true;
 }
 
 void* nArrayPushEx(void** parray, NuAllocator* allocator, uint elementSize, uint count)
@@ -119,7 +122,10 @@ void* nArrayPushEx(void** parray, NuAllocator* allocator, uint elementSize, uint
 	uint old_length = nArrayLen(*parray);
 	uint new_length = old_length + count;
 
-	nArrayReserveEx(parray, allocator, elementSize, new_length);
+	if (!nArrayReserveEx(parray, allocator, elementSize, new_length)) {
+		return NULL;
+	}
+
 	getArrayHeader(*parray)->length = new_length;
 
 	return ((char*)*parray) + old_length * elementSize;
@@ -141,13 +147,15 @@ uint nArrayLen(void* array)
 	return array ? getArrayHeader(array)->length : 0;
 }
 
-void nArrayAlignUp(void** parray, NuAllocator* allocator, uint alignment)
+bool nArrayAlignUp(void** parray, NuAllocator* allocator, uint alignment)
 {
 	if (!*parray) {
-		nArrayReserveEx(parray, allocator, 1, 1);
+		if (!nArrayReserveEx(parray, allocator, 1, 1)) {
+			return false;
+		}
 	}
 	ArrayHeader* header = getArrayHeader(*parray);
 	char* back = (char*)*parray + header->length;
 	uint64_t offset = (char*)nAlignPtrUp(back, alignment) - back;
-	nArrayPushEx(parray, allocator, 1, (uint)offset);
+	return nArrayPushEx(parray, allocator, 1, (uint)offset) != NULL;
 }

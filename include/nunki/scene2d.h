@@ -11,20 +11,31 @@
 
 NU_HANDLE(NuScene2D);
 
-typedef struct {
-	uint isImmediate : 1;
-} NuScene2DCreateInfo;
+/**
+ * Write the #documentation.
+ */
+#define NU_IMMEDIATE_SCENE2D NULL
 
-typedef struct {
+typedef struct
+{
 	NuContext context;
-	NuRect2i  bounds;
-	uint      enableScissors : 1;
-} NuScene2DResetInfo;
+	NuRect2i  viewport;
+} Nu2dBeginImmediateInfo;
 
 /**
  * Write the #documentation.
  */
-NUNKI_API NuResult nuCreateScene2D(NuScene2DCreateInfo const* info, NuAllocator* allocator, NuScene2D* scene);
+NUNKI_API void nu2dImmediateBegin(Nu2dBeginImmediateInfo const* info);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API void nu2dImmediateEnd(void);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuResult nuCreateScene2D(NuAllocator* allocator, NuScene2D* scene);
 
 /**
  * Write the #documentation.
@@ -34,20 +45,39 @@ NUNKI_API void nuDestroyScene2D(NuScene2D scene, NuAllocator* allocator);
 /**
  * Write the #documentation.
  */
-NUNKI_API NuResult nu2dReset(NuScene2D scene, NuScene2DResetInfo const* info);
+NUNKI_API NuResult nu2dReset(NuScene2D scene, NuRect2i viewport);
 
 /**
  * Write the #documentation.
  */
-NUNKI_API void nu2dPresent(NuScene2D scene);
+NUNKI_API void nu2dPresent(NuScene2D scene, NuContext context);
 
 /**
  * Write the #documentation.
  */
-NUNKI_API void nu2dSetBlendState(NuScene2D scene, NuBlendState const* blendState);
+NUNKI_API NuResult nu2dBeginQuadsSolid(NuScene2D scene, NuBlendState const* blendState);
 
 /**
  * Write the #documentation.
  */
-NUNKI_API void nu2dDrawQuadSolidFlat(NuScene2D scene, NuRect2 rect, uint32_t color);
+NUNKI_API NuResult nu2dBeginQuadsTextured(NuScene2D scene, NuBlendState const* blendState);
 
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuResult nu2dQuadSolid(NuScene2D scene, NuRect2 rect, uint32_t color);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuResult nu2dQuadSolidEx(NuScene2D scene, NuRect2 rect, uint32_t topLeftColor, uint32_t topRightColor, uint32_t bottomLeftColor, uint32_t bottomRightColor);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuResult nu2dQuadTextured(NuScene2D scene, NuRect2 rect, uint32_t color, uint32_t bottomRightColor);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuResult nu2dQuadTexturedEx(NuScene2D scene, NuRect2 rect, uint32_t topLeftColor, uint32_t topRightColor, uint32_t bottomLeftColor, uint32_t bottomRightColor, NuRect2 uvRect, uint textureIndex);
