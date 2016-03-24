@@ -15,6 +15,7 @@ NU_HANDLE(NuContext);
 NU_HANDLE(NuVertexLayout);
 NU_HANDLE_INDEX(NuTechnique);
 NU_HANDLE(NuBuffer);
+NU_HANDLE(NuTexture);
 
 typedef enum
 {
@@ -78,7 +79,8 @@ typedef enum {
 	NU_UNSIGNED_INT,
 } NuIndexType;
 
-typedef enum {
+typedef enum
+{
 	NU_BLEND_FACTOR_ZERO,
 	NU_BLEND_FACTOR_ONE,
 	NU_BLEND_FACTOR_SRC_COLOR,
@@ -100,13 +102,28 @@ typedef enum {
 	NU_BLEND_FACTOR_ONE_MINUS_SRC1_ALPHA,
 } NuBlendFactor;
 
-typedef enum {
+typedef enum
+{
 	NU_BLEND_FUNC_ADD,
 	NU_BLEND_FUNC_SUB,
 	NU_BLEND_FUNC_REVERSE_SUB,
 	NU_BLEND_FUNC_MIN,
 	NU_BLEND_FUNC_MAX,
 } NuBlendOp;
+
+typedef enum
+{
+	NU_TEXTURE_TYPE_1D,
+	NU_TEXTURE_TYPE_2D,
+	NU_TEXTURE_TYPE_3D,
+	NU_TEXTURE_TYPE_2D_ARRAY,
+	NU_TEXTURE_TYPE_2D_ARRAY,
+	NU_TEXTURE_TYPE_COUNT_
+} NuTextureType;
+
+typedef enum {
+	NU_TEXTURE_FORMAT_R8G8B8A8,
+} NuTextureFormat;
 
 typedef struct {
 	NuBlendFactor srcRgbFactor;
@@ -175,6 +192,13 @@ typedef struct {
 	NuBlendState additiveBlendState;
 	NuBlendState alphaBlendState;
 } NuDeviceDefaultStates;
+
+typedef struct {
+	NuTextureType   type;
+	NuSize3i        size;
+	NuTextureFormat format;
+	const void*     data;
+} NuTextureCreateInfo;
 
 /**
  * Write the #documentation.
@@ -265,3 +289,13 @@ NUNKI_API void nuDeviceSwapBuffers(NuContext context);
  * Write the #documentation.
  */
 NUNKI_API NuDeviceDefaultStates const* nuDeviceGetDefaultStates(void);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuResult nuCreateTexture(NuTextureCreateInfo const* info, NuAllocator* allocator, NuTexture* texture);
+
+/**
+* Write the #documentation.
+*/
+NUNKI_API void nuDestroyTexture(NuTexture texture);

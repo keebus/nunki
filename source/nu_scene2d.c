@@ -310,7 +310,7 @@ void nu2dImmediateEnd(void)
 NuResult nuCreateScene2D(NuAllocator* allocator, NuScene2D* ppScene)
 {
 	EnforceInitialized();
-	allocator = nGetAllocator(allocator);
+	allocator = nGetDefaultOrAllocator(allocator);
 	*ppScene = nNew(Scene2D, allocator);
 	Scene2D* scene = *ppScene;
 	if (!scene) return NU_ERROR_OUT_OF_MEMORY;
@@ -322,10 +322,10 @@ NuResult nuCreateScene2D(NuAllocator* allocator, NuScene2D* ppScene)
 void nuDestroyScene2D(NuScene2D scene, NuAllocator* allocator)
 {
 	EnforceInitialized();
-	allocator = nGetAllocator(allocator);
+	allocator = nGetDefaultOrAllocator(allocator);
 	nArrayFree(scene->commands, allocator);
 	nArrayFree(scene->instanceData, allocator);
-	nFree(scene, nGetAllocator(allocator));
+	nFree(scene, nGetDefaultOrAllocator(allocator));
 }
 
 NuResult nu2dReset(NuScene2D scene, NuRect2i viewport)

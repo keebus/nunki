@@ -14,6 +14,7 @@
 #endif
 
 #define MAX_NUM_CONSTANT_BUFFERS 16
+#define MAX_TEXTURE_UINTS 16
 
 /*-------------------------------------------------------------------------------------------------
  * Types
@@ -53,6 +54,13 @@ typedef struct NuBufferImpl {
 	uint          mapped : 1;
 } Buffer;
 
+typedef struct NuTextureImpl {
+	GLuint          id;
+	NuTextureType   type;
+	NuSize3i        size;
+	NuTextureFormat format;
+} Texture;
+
 typedef struct {
 	GLuint              boundBuffers[3];
 	NuRect2i            viewport;
@@ -63,12 +71,12 @@ typedef struct {
 	NuBlendState        blendState;
 	NuBufferView        constantBuffers[MAX_NUM_CONSTANT_BUFFERS];
 	NuBufferView        vertexBuffers[NU_VERTEX_LAYOUT_MAX_STREAMS];
+	const Texture*      textures[MAX_TEXTURE_UINTS][NU_TEXTURE_TYPE_COUNT_];
 } State;
 
 typedef struct NuContextImpl {
 	NGlContext nglContext;
 	State state;
-	
 } Context;
 
 static struct {
@@ -156,6 +164,8 @@ static inline GLenum PrimitiveTypeToGl(NuPrimitiveType primitive)
 	return (GLenum[]) { GL_POINTS, GL_LINES, GL_LINE_LOOP, GL_TRIANGLE_FAN, GL_TRIANGLE_STRIP, GL_TRIANGLES }[primitive];
 }
 
+static const GLenum kGlTextureType[] = { GL_TEXTURE_1D, GL_TEXTURE_1D, GL_TEXTURE_1D, GL_TEXTURE_1D, GL_TEXTURE_1D, }
+
 static void __stdcall debugCallbackGL(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void* user_data)
 {
 	switch (severity) {
@@ -188,6 +198,24 @@ static void UnbindBuffer(const Buffer *buffer)
 	{
 		glBindBuffer(BufferTypeToGl(buffer->type), 0);
 		gDevice.currentState->boundBuffers[buffer->type] = 0;
+	}
+}
+
+static void BindTexture(uint unit, const Texture* texture)
+{
+	nAssert(unit < MAX_TEXTURE_UINTS);
+	if (gDevice.currentState->textures[unit][texture->type] != texture) {
+		glActiveTexture(GL_TEXTURE0 + unit);
+		glBindTexture(kGlTextureType[texture->type], texture->id);
+	}
+}
+
+static void UnbindTexture(uint unit, NuTextureType type)
+{
+	nAssert(unit < MAX_TEXTURE_UINTS);
+	if (gDevice.currentState->textures[unit][type]) {
+		glActiveTexture(GL_TEXTURE0 + unit);
+		glBindTexture(kGlTextureType[type], 0);
 	}
 }
 
@@ -719,4 +747,44 @@ NuDeviceDefaultStates const* nuDeviceGetDefaultStates(void)
 		},
 	};
 	return &states;
+}
+
+NuResult nuCreateTexture(NuTextureCreateInfo const* info, NuAllocator* allocator, NuTexture* ppTexture)
+{
+	EnforceInitialized();
+	allocator = nGetDefaultOrAllocator(allocator);
+
+	*ppTexture = NULL;
+	Texture* pTexture = nNew(Texture, allocator);
+	if (!pTexture) return NU_ERROR_OUT_OF_MEMORY;
+
+	glGenTextures(1, &pTexture->id);
+	if (!pTexture->id) {
+		nDebugError("Could not create OpenGL texture object.");
+		nFree(pTexture, allocator);
+		return NU_FAILURE;
+	}
+	
+	nuTextureUpdate(texture, )
+
+	*pTexture = **ppTexture;
+	return NU_SUCCESS;
+}
+
+void nuDestroyTexture(NuTexture texture)
+{
+
+}
+
+void nuTextureUpdate(NuTexture texture, const void* data)
+{
+	BindTexture(kGlTextureType[info->type], pTexture->id);
+	
+	switch (texture->type) {
+		case NU_TEXTURE_TYPE_2D:
+			glTexImage2D(GL_TEXTURE_2D, 0, kGlTextureInternalFormat[texture->format], texture->size.width, texture->size.height, 0, )
+
+		default:
+			break;
+	}
 }

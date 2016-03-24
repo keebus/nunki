@@ -54,9 +54,10 @@ int main()
 
 		nuDeviceClear(context, NU_CLEAR_COLOR, (float[]) { 0.2f, 0.3f, 0.5f, 1.0f }, 0, 0);
 
-		//Nu2dBeginImmediateInfo imm2dInfo = {
-		//	context, .viewport = (NuRect2i) { 0, 0, 1280, 720 },
-		//};
+		Nu2dBeginImmediateInfo imm2dInfo = {
+			context,
+			.viewport = (NuRect2i) { 0, 0, 1280, 720 },
+		};
 		//nu2dImmediateBegin(&imm2dInfo);
 		
 		nu2dPresent(scene, context);
@@ -67,7 +68,7 @@ int main()
 	}
 
 after_mainloop:
-	nuDestroyScene2D(scene, NULL);
+	//nuDestroyScene2D(scene, NULL);
 	nuDestroyContext(context, NULL);
 	nuDestroyWindow(window, NULL);
 	nuTerminate();

@@ -11,7 +11,7 @@
 
 extern const NuAllocator nDefaultAllocator;
 
-inline NuAllocator* nGetAllocator(NuAllocator* allocator)
+inline NuAllocator* nGetDefaultOrAllocator(NuAllocator* allocator)
 {
 	return allocator ? allocator : &nDefaultAllocator;
 }

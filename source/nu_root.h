@@ -33,7 +33,7 @@ NuResult nuInitialize(NuInitializeInfo const* info, NuAllocator* allocator)
 	nEnforce(!gInstance.initialized, "Nunki already initialized.");
 	
 	gInstance.initialized = true;
-	allocator = nGetAllocator(allocator);
+	allocator = nGetDefaultOrAllocator(allocator);
 	gInstance.allocator = *allocator;
 
 	NuResult result;

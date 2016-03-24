@@ -42,28 +42,36 @@ typedef struct NuAllocator {
 	void  (*free)(void* ptr, void* userData);
 } NuAllocator;
 
-typedef struct NuPoint2i {
+typedef struct {
 	int x, y;
 } NuPoint2i;
 
-typedef struct NuSize2i {
-	int width, height;
+typedef struct {
+	float x, y;
+} NuPoint2;
+
+typedef struct {
+	uint width, height;
 } NuSize2i;
 
-typedef struct NuRect2i {
+typedef struct {
+	float width, height;
+} NuSize2;
+
+typedef struct{
+	uint width, height, depth;
+} NuSize3i;
+
+typedef struct {
+	float width, height, depth;
+} NuSize3;
+
+typedef struct {
 	NuPoint2i position;
 	NuSize2i  size;
 } NuRect2i;
 
-typedef struct NuPoint2 {
-	float x, y;
-} NuPoint2;
-
-typedef struct NuSize2 {
-	float width, height;
-} NuSize2;
-
-typedef struct NuRect2 {
+typedef struct {
 	NuPoint2 position;
 	NuSize2  size;
 } NuRect2;

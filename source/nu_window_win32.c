@@ -35,7 +35,7 @@ static LRESULT CALLBACK wndProc(HWND hWnd, UINT uMsg, WPARAM  wParam, LPARAM lPa
 NuResult nuCreateWindow(NuWindowCreateInfo const *info, NuAllocator* allocator, NuWindow *outWindow)
 {
 	EnforceInitialized();
-	allocator = nGetAllocator(allocator);
+	allocator = nGetDefaultOrAllocator(allocator);
 
 	nEnforce(info, "Null info provided.");
 	nEnforce(outWindow, "Null handle provided.");
@@ -148,7 +148,7 @@ NuResult nuCreateWindow(NuWindowCreateInfo const *info, NuAllocator* allocator, 
 void nuDestroyWindow(NuWindow window, NuAllocator* allocator)
 {
 	if (!window) return;
-	allocator = nGetAllocator(allocator);
+	allocator = nGetDefaultOrAllocator(allocator);
 
 	if (window->fullscreen) {
 		ChangeDisplaySettings(NULL, 0);
