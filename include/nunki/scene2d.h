@@ -60,7 +60,7 @@ NUNKI_API NuResult nu2dBeginQuadsSolid(NuScene2D scene, NuBlendState const* blen
 /**
  * Write the #documentation.
  */
-NUNKI_API NuResult nu2dBeginQuadsTextured(NuScene2D scene, NuBlendState const* blendState);
+NUNKI_API NuResult nu2dBeginQuadsTextured(NuScene2D scene, NuBlendState const* blendState, NuTexture texture);
 
 /**
  * Write the #documentation.
@@ -75,7 +75,7 @@ NUNKI_API NuResult nu2dQuadSolidEx(NuScene2D scene, NuRect2 rect, uint32_t topLe
 /**
  * Write the #documentation.
  */
-NUNKI_API NuResult nu2dQuadTextured(NuScene2D scene, NuRect2 rect, uint32_t color, uint32_t bottomRightColor);
+NUNKI_API NuResult nu2dQuadTextured(NuScene2D scene, NuRect2 rect, uint32_t color, NuRect2 uvRect, uint textureIndex);
 
 /**
  * Write the #documentation.

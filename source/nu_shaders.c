@@ -6,7 +6,7 @@
 
 #include "nu_shaders.h"
 
-const char* N_SHADER_SRC_SOLID_QUAD_2D_FRAG = 
+const char* N_SHADER_SRC_2D_QUAD_SOLID_FRAG = 
 		"/*\n"
 		" * Yume (simple rendering engine)\n"
 		" * Copyright (C) 2015 Canio Massimo Tristano <massimo.tristano@gmail.com>.\n"
@@ -24,7 +24,7 @@ const char* N_SHADER_SRC_SOLID_QUAD_2D_FRAG =
 		"	fFragColor = vColor;\n"
 		"}\n";
 
-const char* N_SHADER_SRC_SOLID_QUAD_2D_VERT = 
+const char* N_SHADER_SRC_2D_QUAD_SOLID_VERT = 
 		"/*\n"
 		" * Yume (simple rendering engine)\n"
 		" * Copyright (C) 2015 Canio Massimo Tristano <massimo.tristano@gmail.com>.\n"
@@ -46,6 +46,59 @@ const char* N_SHADER_SRC_SOLID_QUAD_2D_VERT =
 		"void main()\n"
 		"{\n"
 		"	vColor = aiColor;\n"
+		"	vec2 position = aiBounds.xy + aiBounds.zw * avPosition;\n"
+		"	gl_Position = scene2d.transform * vec4(position, 0, 1);\n"
+		"}\n";
+
+const char* N_SHADER_SRC_2D_QUAD_TEXTURED_FRAG = 
+		"/*\n"
+		" * Nunki (simple rendering engine)\n"
+		" * Copyright (C) 2015 Canio Massimo Tristano <massimo.tristano@gmail.com>.\n"
+		" * For licensing info see LICENSE.\n"
+		" */\n"
+		"\n"
+		"#version 330\n"
+		"\n"
+		"uniform texture2D tTexture;\n"
+		"uniform sampler2D sSampler;\n"
+		"\n"
+		"flat in vec4 vColor;\n"
+		"in vec3 vUV;\n"
+		"\n"
+		"out vec4 fFragColor;\n"
+		"\n"
+		"void main()\n"
+		"{\n"
+		"	vec4 texColor = textureLod(sSampler, tTexture, vUV.xy, 0);\n"
+		"	fFragColor = vColor * texColor;\n"
+		"}\n";
+
+const char* N_SHADER_SRC_2D_QUAD_TEXTURED_VERT = 
+		"/*\n"
+		" * Nunki (simple rendering engine)\n"
+		" * Copyright (C) 2015 Canio Massimo Tristano <massimo.tristano@gmail.com>.\n"
+		" * For licensing info see LICENSE.\n"
+		" */\n"
+		"\n"
+		"#version 330\n"
+		"\n"
+		"uniform cbScene2D {\n"
+		"	mat4 transform; // #todo we probably don't need a full matrix here\n"
+		"} scene2d;\n"
+		"\n"
+		"layout(location = 0) in vec2 avPosition;\n"
+		"layout(location = 1) in vec4 aiBounds;\n"
+		"layout(location = 2) in vec4 aiColor;\n"
+		"layout(location = 1) in vec4 aiUvRect;\n"
+		"layout(location = 2) in vec4 aiTextureIndex;\n"
+		"\n"
+		"flat out vec4 vColor;\n"
+		"out vec3 vUV;\n"
+		"\n"
+		"void main()\n"
+		"{\n"
+		"	vColor = aiColor;\n"
+		"	vUV = vec3(aiRect.xy + aiRect.zw * avPosition, aiTextureIndex);\n"
 		"	vec2 position = aiBounds.xy + aiBounds.zw * avPosition;\n"
 		"	gl_Position = scene2d.transform * vec4(position, 0, 1);\n"
 		"}\n";

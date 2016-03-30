@@ -32,16 +32,22 @@ int main()
 	NuContext context;
 	nuCreateContext(&contextInfo, NULL, &context);
 
-	NuScene2D scene;
-	nuCreateScene2D(NULL, &scene);
+	NuTextureCreateInfo textureInfo = {
+		.type = NU_TEXTURE_TYPE_2D,
+		.size = { 1, 1, 1 },
+		.format = NU_TEXTURE_FORMAT_R8G8B8,
+	};
 
-	nu2dReset(scene, (NuRect2i) { 0, 0, 1280, 720 });
-	nu2dBeginQuadsSolid(scene, &nuDeviceGetDefaultStates()->alphaBlendState);
-	nu2dQuadSolid(scene, (NuRect2) { 10, 10, 100, 100 }, 0xff0000ff);
-	nu2dQuadSolid(scene, (NuRect2) { 20, 20, 100, 100 }, 0xfff000ff);
-	nu2dQuadSolid(scene, (NuRect2) { 30, 30, 100, 100 }, 0xff0f00ff);
-	nu2dQuadSolid(scene, (NuRect2) { 40, 40, 100, 100 }, 0xff00f0ff);
-	nu2dQuadSolid(scene, (NuRect2) { 50, 50, 100, 100 }, 0xff000fff);
+	NuTexture texture;
+	nuCreateTexture(&textureInfo, NULL, &texture);
+
+	NuImageView imageView = {
+		.format = NU_IMAGE_FORMAT_RGBA8,
+		.size = { 1, 1 },
+		.data = (uint32_t[]) { 0xff0000ff }
+	};
+
+	nuTextureUpdateLevels(texture, 0, 1, &imageView);
 
 	NuWindowEvent e;
 	for (;;)
@@ -58,17 +64,21 @@ int main()
 			context,
 			.viewport = (NuRect2i) { 0, 0, 1280, 720 },
 		};
-		//nu2dImmediateBegin(&imm2dInfo);
 		
-		nu2dPresent(scene, context);
+		
+		nu2dImmediateBegin(&imm2dInfo);
 
-		//nu2dImmediateEnd();
+		nu2dBeginQuadsTextured(NULL, &nuDeviceGetDefaultStates()->additiveBlendState, texture);
+
+		nu2dQuadTextured(NULL, (NuRect2) { 10, 10, 100, 100 }, 0xffffffff, (NuRect2) { 0, 0, 1, 1 }, 0);
+		
+		nu2dImmediateEnd();
 
 		nuDeviceSwapBuffers(context);
 	}
 
 after_mainloop:
-	//nuDestroyScene2D(scene, NULL);
+	nuDestroyTexture(texture, NULL);
 	nuDestroyContext(context, NULL);
 	nuDestroyWindow(window, NULL);
 	nuTerminate();

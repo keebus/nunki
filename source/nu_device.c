@@ -5,6 +5,7 @@
  */
 
 #include "nu_device.h"
+#include "nu_device_gl_translation.inl"
 #include "nu_base.h"
 #include "nu_libs.h"
 #include "thirdparty/gl3w.h"
@@ -61,6 +62,13 @@ typedef struct NuTextureImpl {
 	NuTextureFormat format;
 } Texture;
 
+typedef struct NuSamplerImpl {
+	NuFilterMode minFilterMod;
+	NuFilterMode magFilterMode;
+	NuWrapMode   uWrapMode;
+	NuWrapMode   vWrapMode;
+} Sampler;
+
 typedef struct {
 	GLuint              boundBuffers[3];
 	NuRect2i            viewport;
@@ -72,6 +80,8 @@ typedef struct {
 	NuBufferView        constantBuffers[MAX_NUM_CONSTANT_BUFFERS];
 	NuBufferView        vertexBuffers[NU_VERTEX_LAYOUT_MAX_STREAMS];
 	const Texture*      textures[MAX_TEXTURE_UINTS][NU_TEXTURE_TYPE_COUNT_];
+	Sampler const*      samplers[MAX_TEXTURE_UINTS];
+	bool                dirtySamplers[MAX_TEXTURE_UINTS];
 } State;
 
 typedef struct NuContextImpl {
@@ -87,10 +97,6 @@ static struct {
 	State             state;
 	State*            currentState;
 } gDevice;
-
-/*-------------------------------------------------------------------------------------------------
- * Globals
- *-----------------------------------------------------------------------------------------------*/
 
 /*-------------------------------------------------------------------------------------------------
  * Static functions
@@ -114,57 +120,6 @@ static inline NuAllocator* GetDeviceAllocator(NuAllocator* allocator)
 {
 	return allocator ? allocator : &gDevice.allocator;
 }
-
-static inline GLenum BufferTypeToGl(NuBufferType type)
-{
-	return (GLenum[]) { GL_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER, GL_UNIFORM_BUFFER }[type];
-}
-
-static inline GLenum BufferUsageToGl(NuBufferUsage usage)
-{
-	return (GLenum[]) { GL_STATIC_DRAW, GL_DYNAMIC_DRAW, GL_STREAM_DRAW }[usage];
-}
-
-static inline uint GetAttributeTypeSize(NuVertexAttributeType type)
-{
-	switch (type) {
-		case NU_VAT_INT8: case NU_VAT_UINT8: case NU_VAT_SNORM8: case NU_VAT_UNORM8: return 1;
-		case NU_VAT_INT16: case NU_VAT_UINT16: case NU_VAT_SNORM16: case NU_VAT_UNORM16: return 2;
-		case NU_VAT_INT32: case NU_VAT_UINT32: case NU_VAT_SNORM32: case NU_VAT_UNORM32:  return 4;
-		case NU_VAT_FLOAT: return 4;
-	}
-	nDebugBreak();
-	return 0;
-}
-
-static inline void UnpackVertexLayoutAttributeTypeToGl(NuVertexAttributeType type, GLenum *gl_type, bool *normalized, bool *integer)
-{
-	switch (type) {
-		case NU_VAT_INT8:  *gl_type = GL_BYTE; *normalized = false; *integer = true; return;
-		case NU_VAT_UINT8: *gl_type = GL_UNSIGNED_BYTE; *normalized = false; *integer = true; return;
-		case NU_VAT_SNORM8: *gl_type = GL_BYTE; *normalized = true; *integer = false; return;
-		case NU_VAT_UNORM8: *gl_type = GL_UNSIGNED_BYTE; *normalized = true; *integer = false; return;
-
-		case NU_VAT_INT16:  *gl_type = GL_SHORT; *normalized = false; *integer = true; return;
-		case NU_VAT_UINT16: *gl_type = GL_UNSIGNED_SHORT; *normalized = false; *integer = true; return;
-		case NU_VAT_SNORM16: *gl_type = GL_SHORT; *normalized = true; *integer = false; return;
-		case NU_VAT_UNORM16: *gl_type = GL_UNSIGNED_SHORT; *normalized = true; *integer = false; return;
-
-		case NU_VAT_INT32:  *gl_type = GL_INT; *normalized = false; *integer = true; return;
-		case NU_VAT_UINT32: *gl_type = GL_UNSIGNED_INT; *normalized = false; *integer = true; return;
-		case NU_VAT_SNORM32: *gl_type = GL_INT; *normalized = true; *integer = false; return;
-		case NU_VAT_UNORM32: *gl_type = GL_UNSIGNED_INT; *normalized = true; *integer = false; return;
-
-		case NU_VAT_FLOAT: *gl_type = GL_FLOAT; *normalized = false; *integer = false; return;
-	}
-}
-
-static inline GLenum PrimitiveTypeToGl(NuPrimitiveType primitive)
-{
-	return (GLenum[]) { GL_POINTS, GL_LINES, GL_LINE_LOOP, GL_TRIANGLE_FAN, GL_TRIANGLE_STRIP, GL_TRIANGLES }[primitive];
-}
-
-static const GLenum kGlTextureType[] = { GL_TEXTURE_1D, GL_TEXTURE_1D, GL_TEXTURE_1D, GL_TEXTURE_1D, GL_TEXTURE_1D, }
 
 static void __stdcall debugCallbackGL(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void* user_data)
 {
@@ -217,6 +172,30 @@ static void UnbindTexture(uint unit, NuTextureType type)
 		glActiveTexture(GL_TEXTURE0 + unit);
 		glBindTexture(kGlTextureType[type], 0);
 	}
+}
+
+static void BindSampler(uint unit, NuSampler sampler)
+{
+	nAssert(unit < MAX_TEXTURE_UINTS);
+	Sampler* cachedSampler = &gDevice.currentState->samplers[unit];
+	if (cachedSampler->magFilterMode != sampler->magFilterMode ||
+		cachedSampler->minFilterMod != sampler->minFilterMod ||
+		cachedSampler->uWrapMode != sampler->uWrapMode ||
+		cachedSampler->vWrapMode != sampler->vWrapMode)
+	{
+		*cachedSampler = *sampler;
+		glBindSampler(unit, sampler->id);
+	}
+}
+
+static void UpdateSamplers(void)
+{
+	for (uint i = 0; i < gDevice.currentState->technique->numSamplers; ++i)
+	//glSamplerParameterf(pSampler->id, GL_TEXTURE_MIN_FILTER, kGlSamplerFilter[info->minFilterMode]);
+//glSamplerParameterf(pSampler->id, GL_TEXTURE_MAG_FILTER, kGlSamplerFilter[info->magFilterMode]);
+//glSamplerParameterf(pSampler->id, GL_TEXTURE_WRAP_S, kGlSamplerWrapMode[info->uWrapMode]);
+//glSamplerParameterf(pSampler->id, GL_TEXTURE_WRAP_T, kGlSamplerWrapMode[info->vWrapMode]);
+
 }
 
 static inline Technique const* DeviceGetTechnique(NuTechnique techniqueIndex)
@@ -510,6 +489,84 @@ void nuDestroyContext(NuContext context, NuAllocator* allocator)
 	nFree(context, GetDeviceAllocator(allocator));
 }
 
+NuResult nuCreateTexture(NuTextureCreateInfo const* info, NuAllocator* allocator, NuTexture* ppTexture)
+{
+	EnforceInitialized();
+	allocator = nGetDefaultOrAllocator(allocator);
+
+	*ppTexture = NULL;
+	Texture* pTexture = nNew(Texture, allocator);
+	if (!pTexture) return NU_ERROR_OUT_OF_MEMORY;
+
+	glGenTextures(1, &pTexture->id);
+	if (!pTexture->id) {
+		nDebugError("Could not create OpenGL texture object.");
+		nFree(pTexture, allocator);
+		return NU_FAILURE;
+	}
+
+	pTexture->type = info->type;
+	pTexture->size = info->size;
+	pTexture->format = info->format;
+
+	*ppTexture = pTexture;
+	return NU_SUCCESS;
+}
+
+void nuDestroyTexture(NuTexture texture, NuAllocator* allocator)
+{
+	EnforceInitialized();
+	if (!texture) return;
+	allocator = nGetDefaultOrAllocator(allocator);
+	glDeleteTextures(1, &texture->id);
+	nFree(texture, allocator);
+}
+
+void nuTextureUpdateLevels(NuTexture texture, uint baseLevel, uint numLevels, NuImageView const* images)
+{
+	BindTexture(0, texture);
+	GLenum pixelFormat, pixelType;
+
+	switch (texture->type) {
+		case NU_TEXTURE_TYPE_2D:
+			nEnforce(baseLevel == 0, "Level must be zero for 2D textures.");
+			nEnforce(numLevels == 1, "2D textures only have one level.");
+			ImageFormatToGl(images->format, &pixelFormat, &pixelType);
+			glTexImage2D(GL_TEXTURE_2D, 0, kGlTextureInternalFormat[texture->format], texture->size.width, texture->size.height, 0, pixelFormat, pixelType, images->data);
+			break;
+
+		default:
+			nAssert(false);
+			break;
+	}
+}
+
+NuResult nuCreateSampler(NuSamplerCreateInfo const* info, NuAllocator* allocator, NuSampler* ppSampler)
+{
+	EnforceInitialized();
+	
+	allocator = nGetDefaultOrAllocator(allocator);
+	*ppSampler = NULL;
+
+	Sampler* pSampler = nNew(Sampler, allocator);
+	if (!pSampler) return NU_ERROR_OUT_OF_MEMORY;
+
+	pSampler->minFilterMod = info->minFilterMode;
+	pSampler->magFilterMode = info->magFilterMode;
+	pSampler->uWrapMode = info->uWrapMode;
+	pSampler->vWrapMode = info->vWrapMode;
+	
+	*ppSampler = pSampler;
+	return NU_SUCCESS;
+}
+
+void nuDestorySampler(NuSampler sampler, NuAllocator* allocator)
+{
+	if (!sampler) return;
+	allocator = nGetDefaultOrAllocator(allocator);
+	nFree(sampler, allocator);
+}
+
 void nuDeviceClear(NuContext context, NuClearFlags flags, float* color4, float depth, uint stencil)
 {
 	EnforceInitialized();
@@ -687,6 +744,31 @@ void nuDeviceSetConstantBuffers(NuContext context, uint base, uint count, NuBuff
 	}
 }
 
+void nuDeviceSetTextures(NuContext context, uint base, uint count, NuTexture const* textures)
+{
+	EnforceInitialized();
+	BindContext(context);
+	nEnforce(base + count <= MAX_TEXTURE_UINTS, "Textures array larger than device bounds.");
+
+	for (uint i = 0; i < count; ++i) {
+		gDevice.currentState->dirtySamplers[i] = true;
+		BindTexture(base + i, textures[i]);
+	}
+}
+
+void nuDeviceSetSamplers(NuContext context, uint base, uint count, NuSampler const* samplers)
+{
+	EnforceInitialized();
+	BindContext(context);
+	nEnforce(base + count <= MAX_TEXTURE_UINTS, "Samplers array out of device bounds.");
+	
+	for (uint i = 0; i < count; ++i) {
+		if (gDevice.currentState->samplers[i] == samplers[i]) continue;
+		gDevice.currentState->samplers[i + base] = samplers[i];
+		gDevice.currentState->dirtySamplers[i + base] = true;
+	}
+}
+
 void nuDeviceDrawArrays(NuContext context, NuPrimitiveType primitive, uint firstVertex, uint numVertices, uint numInstances)
 {
 	EnforceInitialized();
@@ -699,7 +781,9 @@ void nuDeviceDrawArrays(NuContext context, NuPrimitiveType primitive, uint first
 		nuDeviceSetVertexBuffers(context, 0, gDevice.currentState->numActiveAttributes, gDevice.currentState->vertexBuffers);
 	}
 
-	glDrawArraysInstanced(PrimitiveTypeToGl(primitive), firstVertex, numVertices, numInstances);
+	UpdateSamplers();
+
+	glDrawArraysInstanced(kGlPrimitiveType[primitive], firstVertex, numVertices, numInstances);
 }
 
 void nuDeviceDrawIndexed(NuContext context, NuPrimitiveType primitive, NuIndexBufferView indexBuffer, uint firstVertex, uint numIndices, uint numInstances, uint baseVertex)
@@ -714,10 +798,12 @@ void nuDeviceDrawIndexed(NuContext context, NuPrimitiveType primitive, NuIndexBu
 		nuDeviceSetVertexBuffers(context, 0, gDevice.currentState->numActiveAttributes, gDevice.currentState->vertexBuffers);
 	}
 
+	UpdateSamplers();
+
 	BindBuffer(indexBuffer.bufferView.buffer);
 
 	GLenum glIndexType = (GLenum[]) { GL_UNSIGNED_BYTE, GL_UNSIGNED_SHORT, GL_UNSIGNED_INT }[indexBuffer.indexType];
-	glDrawElementsInstancedBaseVertex(PrimitiveTypeToGl(primitive), numIndices, glIndexType, (const void*)(uintptr_t)indexBuffer.bufferView.offset, numInstances, baseVertex);
+	glDrawElementsInstancedBaseVertex(kGlPrimitiveType[primitive], numIndices, glIndexType, (const void*)(uintptr_t)indexBuffer.bufferView.offset, numInstances, baseVertex);
 }
 
 void nuDeviceSwapBuffers(NuContext context)
@@ -747,44 +833,4 @@ NuDeviceDefaultStates const* nuDeviceGetDefaultStates(void)
 		},
 	};
 	return &states;
-}
-
-NuResult nuCreateTexture(NuTextureCreateInfo const* info, NuAllocator* allocator, NuTexture* ppTexture)
-{
-	EnforceInitialized();
-	allocator = nGetDefaultOrAllocator(allocator);
-
-	*ppTexture = NULL;
-	Texture* pTexture = nNew(Texture, allocator);
-	if (!pTexture) return NU_ERROR_OUT_OF_MEMORY;
-
-	glGenTextures(1, &pTexture->id);
-	if (!pTexture->id) {
-		nDebugError("Could not create OpenGL texture object.");
-		nFree(pTexture, allocator);
-		return NU_FAILURE;
-	}
-	
-	nuTextureUpdate(texture, )
-
-	*pTexture = **ppTexture;
-	return NU_SUCCESS;
-}
-
-void nuDestroyTexture(NuTexture texture)
-{
-
-}
-
-void nuTextureUpdate(NuTexture texture, const void* data)
-{
-	BindTexture(kGlTextureType[info->type], pTexture->id);
-	
-	switch (texture->type) {
-		case NU_TEXTURE_TYPE_2D:
-			glTexImage2D(GL_TEXTURE_2D, 0, kGlTextureInternalFormat[texture->format], texture->size.width, texture->size.height, 0, )
-
-		default:
-			break;
-	}
 }

@@ -17,28 +17,40 @@
 typedef struct {
 	NuRect2 rect;
 	uint    color;
-} SolidQuad;
+} QuadSolid;
+
+typedef struct {
+	NuRect2 rect;
+	uint    color;
+	NuRect2 uvRect;
+	uint    textureIndex;
+} QuadTextured;
 
 typedef enum {
-	MESH_TYPE_SOLID_QUAD
+	MESH_TYPE_QUAD_SOLID,
+	MESH_TYPE_QUAD_TEXTURED,
 } MeshType;
 
 static const uint kMeshInstanceSize[] = {
-	sizeof(SolidQuad),
+	sizeof(QuadSolid),
+	sizeof(QuadTextured)
 };
 
 static const NuPrimitiveType kMeshPrimitiveType[] = {
+	NU_PRIMITIVE_TRIANGLE_STRIP,
 	NU_PRIMITIVE_TRIANGLE_STRIP,
 };
 
 static const char* kMeshTypeStr[] = {
 	"solid quad",
+	"textured quad",
 };
 
 typedef struct {
 	MeshType     meshType;
 	NuTechnique  technique;
 	NuBlendState blendState;
+	NuTexture    texture;
 } DeviceState;
 
 typedef struct {
@@ -135,6 +147,14 @@ static void ExecuteImmediateCommand(Command* command, NuContext context)
 	gScene2D.immediateHasCommand = false;
 }
 
+static bool CompatibleDeviceStates(const DeviceState* s1, const DeviceState* s2)
+{
+	return s1->meshType == s2->meshType &&
+		s1->technique == s2->technique &&
+		memcmp(&s1->blendState, &s2->blendState, sizeof(NuBlendState)) == 0 &&
+		s1->texture == s2->texture;
+}
+
 /**
  * Executes a single draw command.
  */
@@ -147,19 +167,19 @@ static Command* NewCommand(Scene2D* scene, DeviceState const* deviceState)
 
 	if (scene) {
 		uint n = nArrayLen(scene->commands);
-		if (n > 0 && memcmp(&scene->commands[n - 1].deviceState, deviceState, sizeof(DeviceState)) == 0) {
+		if (n > 0 && CompatibleDeviceStates(&scene->commands[n - 1].deviceState, deviceState)) {
 			return &scene->commands[n - 1];
 		}
 		command = nArrayPush(&scene->commands, &scene->allocator, Command);
 		if (!command) return NULL;
 
 		allocator = &scene->allocator;
-		instanceData = &scene->instanceData;		
+		instanceData = &scene->instanceData;
 	}
 	/* if null, user asks for immediate mode scene */
 	else {
 		/* if different commands, we need to flush the current one before continuing */
-		if (gScene2D.immediateHasCommand && memcmp(&gScene2D.immediateCommand.deviceState, deviceState, sizeof(DeviceState)) != 0) {
+		if (gScene2D.immediateHasCommand && !CompatibleDeviceStates(&gScene2D.immediateCommand.deviceState, deviceState)) {
 			ExecuteImmediateCommand(&gScene2D.immediateCommand, gScene2D.immediateContext);
 		}
 		gScene2D.immediateHasCommand = true;
@@ -356,8 +376,8 @@ void nu2dPresent(NuScene2D scene, NuContext context)
 NuResult nu2dBeginQuadsSolid(NuScene2D scene, NuBlendState const* blendState)
 {
 	DeviceState state = {
-		.meshType = MESH_TYPE_SOLID_QUAD,
-		.technique = nGetBuiltins()->techniqueSolidQuad2D,
+		.meshType = MESH_TYPE_QUAD_SOLID,
+		.technique = nGetBuiltins()->technique2dQuadSolid,
 		.blendState = *blendState,
 	};
 
@@ -365,20 +385,28 @@ NuResult nu2dBeginQuadsSolid(NuScene2D scene, NuBlendState const* blendState)
 	return command ? NU_SUCCESS : NU_ERROR_OUT_OF_MEMORY;
 }
 
-NuResult nu2dBeginQuadsTextured(NuScene2D scene, NuBlendState const* blendState)
+NuResult nu2dBeginQuadsTextured(NuScene2D scene, NuBlendState const* blendState, NuTexture texture)
 {
 	EnforceInitialized();
-	nEnforce(false, "Unimplemented.");
-	return 0;
+	DeviceState state = {
+		.meshType   = MESH_TYPE_QUAD_TEXTURED,
+		.technique  = nGetBuiltins()->technique2dQuadTextured,
+		.blendState = *blendState,
+		.texture    = texture,
+	};
+
+	Command* command = NewCommand(scene, &state);
+	return command ? NU_SUCCESS : NU_ERROR_OUT_OF_MEMORY;
 }
 
 NuResult nu2dQuadSolid(NuScene2D scene, NuRect2 rect, uint32_t color)
 {
-	SolidQuad* quad = NewInstance(scene, MESH_TYPE_SOLID_QUAD);
+	QuadSolid* quad = NewInstance(scene, MESH_TYPE_QUAD_SOLID);
 	if (!quad) {
 		return NU_ERROR_OUT_OF_MEMORY;
 	}
-	*quad = (SolidQuad) { rect, nSwizzleUInt(color) };
+	quad->rect = rect;
+	quad->color = nSwizzleUInt(color);
 	return NU_SUCCESS;
 }
 
@@ -389,11 +417,18 @@ NuResult nu2dQuadSolidEx(NuScene2D scene, NuRect2 rect, uint32_t topLeftColor, u
 	return 0;
 }
 
-NuResult nu2dQuadTextured(NuScene2D scene, NuRect2 rect, uint32_t color, uint32_t bottomRightColor)
+NuResult nu2dQuadTextured(NuScene2D scene, NuRect2 rect, uint32_t color, NuRect2 uvRect, uint textureIndex)
 {
 	EnforceInitialized();
-	nEnforce(false, "Unimplemented.");
-	return 0;
+	QuadTextured* quad = NewInstance(scene, MESH_TYPE_QUAD_TEXTURED);
+	if (!quad) {
+		return NU_ERROR_OUT_OF_MEMORY;
+	}
+	quad->rect = rect;
+	quad->color = color;
+	quad->uvRect = uvRect;
+	quad->textureIndex = textureIndex;
+	return NU_SUCCESS;
 }
 
 NuResult nu2dQuadTexturedEx(NuScene2D scene, NuRect2 rect, uint32_t topLeftColor, uint32_t topRightColor, uint32_t bottomLeftColor, uint32_t bottomRightColor, NuRect2 uvRect, uint textureIndex)

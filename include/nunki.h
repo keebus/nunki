@@ -9,5 +9,6 @@
 #include "nunki/base.h"
 #include "nunki/root.h"
 #include "nunki/window.h"
+#include "nunki/image.h"
 #include "nunki/device.h"
 #include "nunki/scene2d.h"

@@ -11,10 +11,15 @@
 typedef struct NBuiltinResources {
 
 	/* vertex layouts */
-	NuVertexLayout vertexLayoutQuadInstance;
+	NuVertexLayout vertexLayout2dQuadSolid;
+	NuVertexLayout vertexLayout2dQuadTextured;
+
+	/* samplers */
+	NuSampler samplerLinear;
 
 	/* techniques */
-	NuTechnique techniqueSolidQuad2D;
+	NuTechnique technique2dQuadSolid;
+	NuTechnique technique2dQuadTextured;
 
 } NBuiltinResources;
 

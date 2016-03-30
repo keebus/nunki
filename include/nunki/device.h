@@ -7,6 +7,7 @@
 #pragma  once
 
 #include "./base.h"
+#include "./image.h"
 
 #define NU_VERTEX_LAYOUT_MAX_STREAM_ATTRIBUTES 16
 #define NU_VERTEX_LAYOUT_MAX_STREAMS 8
@@ -16,6 +17,7 @@ NU_HANDLE(NuVertexLayout);
 NU_HANDLE_INDEX(NuTechnique);
 NU_HANDLE(NuBuffer);
 NU_HANDLE(NuTexture);
+NU_HANDLE(NuSampler);
 
 typedef enum
 {
@@ -116,14 +118,26 @@ typedef enum
 	NU_TEXTURE_TYPE_1D,
 	NU_TEXTURE_TYPE_2D,
 	NU_TEXTURE_TYPE_3D,
-	NU_TEXTURE_TYPE_2D_ARRAY,
+	NU_TEXTURE_TYPE_1D_ARRAY,
 	NU_TEXTURE_TYPE_2D_ARRAY,
 	NU_TEXTURE_TYPE_COUNT_
 } NuTextureType;
 
 typedef enum {
-	NU_TEXTURE_FORMAT_R8G8B8A8,
+	NU_TEXTURE_FORMAT_R8G8B8,
 } NuTextureFormat;
+
+typedef enum {
+	NU_FILTER_MODE_NEAREST,
+	NU_FILTER_MODE_LINEAR,
+	NU_FILTER_MODE_MIPMAP_NEAREST,
+	NU_FILTER_MODE_MIPMAP_LINEAR,
+} NuFilterMode;
+
+typedef enum {
+	NU_WRAP_MODE_CLAMP,
+	NU_WRAP_MODE_REPEAT,
+} NuWrapMode;
 
 typedef struct {
 	NuBlendFactor srcRgbFactor;
@@ -197,8 +211,14 @@ typedef struct {
 	NuTextureType   type;
 	NuSize3i        size;
 	NuTextureFormat format;
-	const void*     data;
 } NuTextureCreateInfo;
+
+typedef struct {
+	NuFilterMode minFilterMode;
+	NuFilterMode magFilterMode;
+	NuWrapMode   uWrapMode;
+	NuWrapMode   vWrapMode;
+} NuSamplerCreateInfo;
 
 /**
  * Write the #documentation.
@@ -243,6 +263,31 @@ NUNKI_API void nuDestroyContext(NuContext context, NuAllocator* allocator);
 /**
  * Write the #documentation.
  */
+NUNKI_API NuResult nuCreateTexture(NuTextureCreateInfo const* info, NuAllocator* allocator, NuTexture* texture);
+
+/**
+* Write the #documentation.
+*/
+NUNKI_API void nuDestroyTexture(NuTexture texture, NuAllocator* allocator);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API void nuTextureUpdateLevels(NuTexture texture, uint baseLevel, uint numLevels, NuImageView const* images);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuResult nuCreateSampler(NuSamplerCreateInfo const* info, NuAllocator* allocator, NuSampler* pSampler);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API void nuDestorySampler(NuSampler sampler, NuAllocator* allocator);
+
+/**
+ * Write the #documentation.
+ */
 NUNKI_API void nuDeviceClear(NuContext context, NuClearFlags flags, float* color4, float depth, uint stencil);
 
 /**
@@ -273,6 +318,16 @@ NUNKI_API void nuDeviceSetConstantBuffers(NuContext context, uint base, uint cou
 /**
  * Write the #documentation.
  */
+NUNKI_API void nuDeviceSetTextures(NuContext context, uint base, uint count, NuTexture const* textures);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API void nuDeviceSetSamplers(NuContext context, uint base, uint count, NuSampler const* samplers);
+
+/**
+ * Write the #documentation.
+ */
 NUNKI_API void nuDeviceDrawArrays(NuContext context, NuPrimitiveType primitive, uint firstVertex, uint numVertices, uint numInstances);
 
 /**
@@ -289,13 +344,3 @@ NUNKI_API void nuDeviceSwapBuffers(NuContext context);
  * Write the #documentation.
  */
 NUNKI_API NuDeviceDefaultStates const* nuDeviceGetDefaultStates(void);
-
-/**
- * Write the #documentation.
- */
-NUNKI_API NuResult nuCreateTexture(NuTextureCreateInfo const* info, NuAllocator* allocator, NuTexture* texture);
-
-/**
-* Write the #documentation.
-*/
-NUNKI_API void nuDestroyTexture(NuTexture texture);
