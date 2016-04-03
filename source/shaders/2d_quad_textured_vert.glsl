@@ -10,11 +10,11 @@ uniform cbScene2D {
 	mat4 transform; // #todo we probably don't need a full matrix here
 } scene2d;
 
-layout(location = 0) in vec2 avPosition;
-layout(location = 1) in vec4 aiBounds;
-layout(location = 2) in vec4 aiColor;
-layout(location = 1) in vec4 aiUvRect;
-layout(location = 2) in vec4 aiTextureIndex;
+layout(location = 0) in vec2  avPosition;
+layout(location = 1) in vec4  aiBounds;
+layout(location = 2) in vec4  aiColor;
+layout(location = 3) in vec4  aiUvRect;
+layout(location = 4) in uint  aiTextureIndex;
 
 flat out vec4 vColor;
 out vec3 vUV;
@@ -22,7 +22,7 @@ out vec3 vUV;
 void main()
 {
 	vColor = aiColor;
-	vUV = vec3(aiRect.xy + aiRect.zw * avPosition, aiTextureIndex);
+	vUV = vec3(aiUvRect.xy + aiUvRect.zw * avPosition, aiTextureIndex);
 	vec2 position = aiBounds.xy + aiBounds.zw * avPosition;
 	gl_Position = scene2d.transform * vec4(position, 0, 1);
 }

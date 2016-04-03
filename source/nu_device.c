@@ -63,6 +63,7 @@ typedef struct NuTextureImpl {
 } Texture;
 
 typedef struct NuSamplerImpl {
+	GLuint       id;
 	NuFilterMode minFilterMod;
 	NuFilterMode magFilterMode;
 	NuWrapMode   uWrapMode;
@@ -93,6 +94,7 @@ static struct {
 	bool              initialized;
 	NuAllocator       allocator;
 	NGlContextManager nglContextManager;
+	NuDeviceDefaults  defaults;
 	Technique*        techniques;
 	State             state;
 	State*            currentState;
@@ -177,25 +179,12 @@ static void UnbindTexture(uint unit, NuTextureType type)
 static void BindSampler(uint unit, NuSampler sampler)
 {
 	nAssert(unit < MAX_TEXTURE_UINTS);
-	Sampler* cachedSampler = &gDevice.currentState->samplers[unit];
-	if (cachedSampler->magFilterMode != sampler->magFilterMode ||
-		cachedSampler->minFilterMod != sampler->minFilterMod ||
-		cachedSampler->uWrapMode != sampler->uWrapMode ||
-		cachedSampler->vWrapMode != sampler->vWrapMode)
-	{
-		*cachedSampler = *sampler;
+	Sampler const** pCachedSampler = &gDevice.currentState->samplers[unit];
+	if (*pCachedSampler != sampler) {
+		*pCachedSampler = sampler;
+		glActiveTexture(GL_TEXTURE0 + unit);
 		glBindSampler(unit, sampler->id);
 	}
-}
-
-static void UpdateSamplers(void)
-{
-	for (uint i = 0; i < gDevice.currentState->technique->numSamplers; ++i)
-	//glSamplerParameterf(pSampler->id, GL_TEXTURE_MIN_FILTER, kGlSamplerFilter[info->minFilterMode]);
-//glSamplerParameterf(pSampler->id, GL_TEXTURE_MAG_FILTER, kGlSamplerFilter[info->magFilterMode]);
-//glSamplerParameterf(pSampler->id, GL_TEXTURE_WRAP_S, kGlSamplerWrapMode[info->uWrapMode]);
-//glSamplerParameterf(pSampler->id, GL_TEXTURE_WRAP_T, kGlSamplerWrapMode[info->vWrapMode]);
-
 }
 
 static inline Technique const* DeviceGetTechnique(NuTechnique techniqueIndex)
@@ -232,12 +221,56 @@ NuResult nInitDevice(NuAllocator* allocator, void* dummyWindowHandle)
 	}
 #endif
 
+	/* create device defaults */
+	{
+		gDevice.defaults = (NuDeviceDefaults) {
+			.defaultBlendState = { 0 },
+				.additiveBlendState = {
+					.srcRgbFactor = NU_BLEND_FACTOR_ONE,
+					.dstRgbFactor = NU_BLEND_FACTOR_ONE,
+					.rgbOp = NU_BLEND_FUNC_ADD,
+					.srcAlphaFactor = NU_BLEND_FACTOR_ONE,
+					.dstAlphaFactor = NU_BLEND_FACTOR_ONE,
+					.alphaOp = NU_BLEND_FUNC_ADD,
+			},
+				.alphaBlendState = {
+					.srcRgbFactor = NU_BLEND_FACTOR_SRC_ALPHA,
+					.dstRgbFactor = NU_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+					.rgbOp = NU_BLEND_FUNC_ADD,
+					.srcAlphaFactor = NU_BLEND_FACTOR_ONE,
+					.dstAlphaFactor = NU_BLEND_FACTOR_ZERO,
+					.alphaOp = NU_BLEND_FUNC_ADD,
+			},
+		};
+
+		NuSamplerCreateInfo info = {
+			.minFilterMode = NU_FILTER_MODE_NEAREST,
+			.magFilterMode = NU_FILTER_MODE_NEAREST,
+			.uWrapMode = NU_WRAP_MODE_CLAMP,
+			.vWrapMode = NU_WRAP_MODE_CLAMP,
+		};
+		nuCreateSampler(&info, allocator, &gDevice.defaults.nearestSampler);
+		nAssert(gDevice.defaults.nearestSampler);
+
+		info.minFilterMode = NU_FILTER_MODE_LINEAR;
+		info.magFilterMode = NU_FILTER_MODE_LINEAR;
+		nuCreateSampler(&info, allocator, &gDevice.defaults.linearSampler);
+		nAssert(gDevice.defaults.linearSampler);
+	}
+
 	return NU_SUCCESS;
 }
 
 void nDeinitDevice(void)
 {
 	if (!gDevice.initialized) return;
+
+	/* deinit device defaults */
+	{
+		nuDestroySampler(gDevice.defaults.nearestSampler, &gDevice.allocator);
+		nuDestroySampler(gDevice.defaults.linearSampler, &gDevice.allocator);
+	}
+
 	nDeinitGlContextManager(&gDevice.nglContextManager);
 	nZero(&gDevice);
 }
@@ -551,19 +584,32 @@ NuResult nuCreateSampler(NuSamplerCreateInfo const* info, NuAllocator* allocator
 	Sampler* pSampler = nNew(Sampler, allocator);
 	if (!pSampler) return NU_ERROR_OUT_OF_MEMORY;
 
+	glGenSamplers(1, &pSampler->id);
+	if (!pSampler->id) {
+		nDebugError("Could not create OpenGL sampler object.");
+		return NU_FAILURE;
+	}
+
 	pSampler->minFilterMod = info->minFilterMode;
 	pSampler->magFilterMode = info->magFilterMode;
 	pSampler->uWrapMode = info->uWrapMode;
 	pSampler->vWrapMode = info->vWrapMode;
+
+	glSamplerParameterf(pSampler->id, GL_TEXTURE_MIN_FILTER, kGlSamplerFilter[pSampler->minFilterMod]);
+	glSamplerParameterf(pSampler->id, GL_TEXTURE_MAG_FILTER, kGlSamplerFilter[pSampler->magFilterMode]);
+	glSamplerParameterf(pSampler->id, GL_TEXTURE_WRAP_S, kGlSamplerWrapMode[pSampler->uWrapMode]);
+	glSamplerParameterf(pSampler->id, GL_TEXTURE_WRAP_T, kGlSamplerWrapMode[pSampler->vWrapMode]);
+
 	
 	*ppSampler = pSampler;
 	return NU_SUCCESS;
 }
 
-void nuDestorySampler(NuSampler sampler, NuAllocator* allocator)
+void nuDestroySampler(NuSampler sampler, NuAllocator* allocator)
 {
 	if (!sampler) return;
 	allocator = nGetDefaultOrAllocator(allocator);
+	glDeleteSamplers(1, &sampler->id);
 	nFree(sampler, allocator);
 }
 
@@ -744,7 +790,7 @@ void nuDeviceSetConstantBuffers(NuContext context, uint base, uint count, NuBuff
 	}
 }
 
-void nuDeviceSetTextures(NuContext context, uint base, uint count, NuTexture const* textures)
+void nuDeviceSetTextures(NuContext context, uint base, uint count, NuTexture const* textures, NuSampler const* samplers)
 {
 	EnforceInitialized();
 	BindContext(context);
@@ -753,6 +799,7 @@ void nuDeviceSetTextures(NuContext context, uint base, uint count, NuTexture con
 	for (uint i = 0; i < count; ++i) {
 		gDevice.currentState->dirtySamplers[i] = true;
 		BindTexture(base + i, textures[i]);
+		if (samplers[i]) BindSampler(base + i, samplers[i]);
 	}
 }
 
@@ -781,8 +828,6 @@ void nuDeviceDrawArrays(NuContext context, NuPrimitiveType primitive, uint first
 		nuDeviceSetVertexBuffers(context, 0, gDevice.currentState->numActiveAttributes, gDevice.currentState->vertexBuffers);
 	}
 
-	UpdateSamplers();
-
 	glDrawArraysInstanced(kGlPrimitiveType[primitive], firstVertex, numVertices, numInstances);
 }
 
@@ -798,8 +843,6 @@ void nuDeviceDrawIndexed(NuContext context, NuPrimitiveType primitive, NuIndexBu
 		nuDeviceSetVertexBuffers(context, 0, gDevice.currentState->numActiveAttributes, gDevice.currentState->vertexBuffers);
 	}
 
-	UpdateSamplers();
-
 	BindBuffer(indexBuffer.bufferView.buffer);
 
 	GLenum glIndexType = (GLenum[]) { GL_UNSIGNED_BYTE, GL_UNSIGNED_SHORT, GL_UNSIGNED_INT }[indexBuffer.indexType];
@@ -811,26 +854,8 @@ void nuDeviceSwapBuffers(NuContext context)
 	nGlContextSwapBuffers(&context->nglContext);
 }
 
-NuDeviceDefaultStates const* nuDeviceGetDefaultStates(void)
-{
-	static const NuDeviceDefaultStates states = {
-		.defaultBlendState = { 0 },
-		.additiveBlendState = {
-			.srcRgbFactor = NU_BLEND_FACTOR_ONE,
-			.dstRgbFactor = NU_BLEND_FACTOR_ONE,
-			.rgbOp = NU_BLEND_FUNC_ADD,
-			.srcAlphaFactor = NU_BLEND_FACTOR_ONE,
-			.dstAlphaFactor = NU_BLEND_FACTOR_ONE,
-			.alphaOp = NU_BLEND_FUNC_ADD,
-		},
-		.alphaBlendState = {
-			.srcRgbFactor = NU_BLEND_FACTOR_SRC_ALPHA,
-			.dstRgbFactor = NU_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-			.rgbOp = NU_BLEND_FUNC_ADD,
-			.srcAlphaFactor = NU_BLEND_FACTOR_ONE,
-			.dstAlphaFactor = NU_BLEND_FACTOR_ZERO,
-			.alphaOp = NU_BLEND_FUNC_ADD,
-		},
-	};
-	return &states;
+NuDeviceDefaults const* nuDeviceGetDefaults(void)
+{	
+	EnforceInitialized();
+	return &gDevice.defaults;
 }

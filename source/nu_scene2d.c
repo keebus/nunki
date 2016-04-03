@@ -47,10 +47,12 @@ static const char* kMeshTypeStr[] = {
 };
 
 typedef struct {
-	MeshType     meshType;
-	NuTechnique  technique;
-	NuBlendState blendState;
-	NuTexture    texture;
+	MeshType            meshType;
+	NuTechnique         technique;
+	const NuBlendState* blendState;
+	NuTexture           texture;
+	NuSampler           sampler;
+	uint                enableTextures : 1;
 } DeviceState;
 
 typedef struct {
@@ -121,12 +123,13 @@ static void ExecuteCommand(Command* command, NuContext context)
 {
 	DeviceState* state = &command->deviceState;
 	
-	nuDeviceSetBlendState(context, &state->blendState);
+	nuDeviceSetBlendState(context, state->blendState);
 
 	/* set device state */
 	nuDeviceSetTechnique(context, state->technique);
 
 	uint primitiveVertexOffset = (uint[]) {
+		gScene2D.quadMeshVertexBufferOffset,
 		gScene2D.quadMeshVertexBufferOffset,
 	}[state->meshType];
 
@@ -134,6 +137,11 @@ static void ExecuteCommand(Command* command, NuContext context)
 		gScene2D.primitivesVertexBuffer, primitiveVertexOffset, 0,
 		gScene2D.instancesVertexBuffer, command->firstInstanceOffset, 0,
 	});
+
+	/* if state has texture, bind it */
+	if (state->enableTextures) {
+		nuDeviceSetTextures(context, 0, 1, &state->texture, &state->sampler);
+	}
 
 	/* issue draw */
 	nuDeviceDrawArrays(context, kMeshPrimitiveType[state->meshType], 0, 4, command->instanceCount);
@@ -373,26 +381,28 @@ void nu2dPresent(NuScene2D scene, NuContext context)
 	}
 }
 
-NuResult nu2dBeginQuadsSolid(NuScene2D scene, NuBlendState const* blendState)
+NuResult nu2dBeginQuadsSolid(NuScene2D scene, const Nu2dQuadsSolidBeginInfo* info)
 {
 	DeviceState state = {
 		.meshType = MESH_TYPE_QUAD_SOLID,
 		.technique = nGetBuiltins()->technique2dQuadSolid,
-		.blendState = *blendState,
+		.blendState = info->blendState,
 	};
 
 	Command* command = NewCommand(scene, &state);
 	return command ? NU_SUCCESS : NU_ERROR_OUT_OF_MEMORY;
 }
 
-NuResult nu2dBeginQuadsTextured(NuScene2D scene, NuBlendState const* blendState, NuTexture texture)
+NuResult nu2dBeginQuadsTextured(NuScene2D scene, const Nu2dQuadsTexturedBeginInfo* info)
 {
 	EnforceInitialized();
 	DeviceState state = {
 		.meshType   = MESH_TYPE_QUAD_TEXTURED,
 		.technique  = nGetBuiltins()->technique2dQuadTextured,
-		.blendState = *blendState,
-		.texture    = texture,
+		.blendState = info->blendState,
+		.texture    = info->texture,
+		.sampler    = info->sampler,
+		.enableTextures = true,
 	};
 
 	Command* command = NewCommand(scene, &state);

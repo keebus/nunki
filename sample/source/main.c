@@ -34,8 +34,8 @@ int main()
 
 	NuTextureCreateInfo textureInfo = {
 		.type = NU_TEXTURE_TYPE_2D,
-		.size = { 1, 1, 1 },
-		.format = NU_TEXTURE_FORMAT_R8G8B8,
+		.size = { 2, 2, 1 },
+		.format = NU_TEXTURE_FORMAT_R8G8B8_UNORM,
 	};
 
 	NuTexture texture;
@@ -43,8 +43,8 @@ int main()
 
 	NuImageView imageView = {
 		.format = NU_IMAGE_FORMAT_RGBA8,
-		.size = { 1, 1 },
-		.data = (uint32_t[]) { 0xff0000ff }
+		.size = { 2, 2 },
+		.data = (uint32_t[]) { 0xff0000ff, 0xff00ff00, 0xffff0000, 0xffffffff }
 	};
 
 	nuTextureUpdateLevels(texture, 0, 1, &imageView);
@@ -68,7 +68,11 @@ int main()
 		
 		nu2dImmediateBegin(&imm2dInfo);
 
-		nu2dBeginQuadsTextured(NULL, &nuDeviceGetDefaultStates()->additiveBlendState, texture);
+		nu2dBeginQuadsTextured(NULL, &(Nu2dQuadsTexturedBeginInfo) {
+			.blendState = &nuDeviceGetDefaults()->defaultBlendState,
+			.texture = texture,
+			.sampler = nuDeviceGetDefaults()->linearSampler,
+		});
 
 		nu2dQuadTextured(NULL, (NuRect2) { 10, 10, 100, 100 }, 0xffffffff, (NuRect2) { 0, 0, 1, 1 }, 0);
 		

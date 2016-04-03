@@ -49,25 +49,13 @@ static void CreateVertexLayouts(NuAllocator* allocator)
 
 	desc.numAttributes = 5;
 	desc.attributes = (NuVertexAttributeDesc[]) {
-		0, NU_VAT_FLOAT, 2,		/* quad normalized 2d pos */
-		1, NU_VAT_FLOAT, 4,		/* instance 2d bounds */
-		1, NU_VAT_UNORM8, 4,	/* instance color */
-		1, NU_VAT_FLOAT, 4,		/* instance 2d uv rect */
-		1, NU_VAT_UNORM8, 4,	/* instance texture index */
+		0, NU_VAT_FLOAT,	2,		/* quad normalized 2d pos */
+		1, NU_VAT_FLOAT,	4,		/* instance 2d bounds */
+		1, NU_VAT_UNORM8,	4,		/* instance color */
+		1, NU_VAT_FLOAT,	4,		/* instance 2d uv rect */
+		1, NU_VAT_UINT32,	1,		/* instance texture index */
 	};
 	LoadVertexLayout(2dQuadTextured, allocator);
-}
-
-static void CreateSamplers(NuAllocator* allocator)
-{
-	NuSamplerCreateInfo info = {
-		.minFilterMode = NU_FILTER_MODE_LINEAR,
-		.magFilterMode = NU_FILTER_MODE_LINEAR,
-		.uWrapMode = NU_WRAP_MODE_CLAMP,
-		.vWrapMode = NU_WRAP_MODE_CLAMP,
-	};
-	NuResult result = nuCreateSampler(&info, allocator, &gBuiltins.samplerLinear);
-	nEnforce(result == NU_SUCCESS, "Built-in sampler creation failed.");
 }
 
 static void CreateTechniques(void)
@@ -88,9 +76,10 @@ static void CreateTechniques(void)
 	CompileTechnique("SolidQuad2D", &info2d, &gBuiltins.technique2dQuadSolid);
 
 	/* textured quad 2d tetured */
-	info2d.layout = gBuiltins.vertexLayout2dQuadSolid;
-	info2d.vertexShaderSource = N_SHADER_SRC_2D_QUAD_SOLID_VERT;
-	info2d.fragmentShaderSource = N_SHADER_SRC_2D_QUAD_SOLID_FRAG;
+	info2d.layout = gBuiltins.vertexLayout2dQuadTextured;
+	info2d.vertexShaderSource = N_SHADER_SRC_2D_QUAD_TEXTURED_VERT;
+	info2d.fragmentShaderSource = N_SHADER_SRC_2D_QUAD_TEXTURED_FRAG;
+	info2d.samplers = (const char*[]) { "sTexture", NULL };
 	CompileTechnique("TexturedQuad2D", &info2d, &gBuiltins.technique2dQuadTextured);
 }
 
@@ -98,7 +87,6 @@ static void CreateTechniques(void)
 void nInitBuiltinResources(NuAllocator* allocator)
 {
 	CreateVertexLayouts(allocator);
-	CreateSamplers(allocator);
 	CreateTechniques();
 }
 

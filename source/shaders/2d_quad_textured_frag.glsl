@@ -6,8 +6,7 @@
 
 #version 330
 
-uniform texture2D tTexture;
-uniform sampler2D sSampler;
+uniform sampler2D sTexture;
 
 flat in vec4 vColor;
 in vec3 vUV;
@@ -16,6 +15,6 @@ out vec4 fFragColor;
 
 void main()
 {
-	vec4 texColor = textureLod(sSampler, tTexture, vUV.xy, 0);
+	vec4 texColor = textureLod(sTexture, vUV.xy, 0);
 	fFragColor = vColor * texColor;
 }

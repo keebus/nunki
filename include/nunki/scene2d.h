@@ -22,6 +22,18 @@ typedef struct
 	NuRect2i  viewport;
 } Nu2dBeginImmediateInfo;
 
+typedef struct
+{
+	const NuBlendState* blendState;
+} Nu2dQuadsSolidBeginInfo;
+
+typedef struct
+{
+	const NuBlendState* blendState;
+	const NuTexture     texture;
+	const NuSampler     sampler;
+} Nu2dQuadsTexturedBeginInfo;
+
 /**
  * Write the #documentation.
  */
@@ -55,12 +67,12 @@ NUNKI_API void nu2dPresent(NuScene2D scene, NuContext context);
 /**
  * Write the #documentation.
  */
-NUNKI_API NuResult nu2dBeginQuadsSolid(NuScene2D scene, NuBlendState const* blendState);
+NUNKI_API NuResult nu2dBeginQuadsSolid(NuScene2D scene, const Nu2dQuadsSolidBeginInfo* info);
 
 /**
  * Write the #documentation.
  */
-NUNKI_API NuResult nu2dBeginQuadsTextured(NuScene2D scene, NuBlendState const* blendState, NuTexture texture);
+NUNKI_API NuResult nu2dBeginQuadsTextured(NuScene2D scene, const Nu2dQuadsTexturedBeginInfo* info);
 
 /**
  * Write the #documentation.

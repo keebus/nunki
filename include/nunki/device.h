@@ -124,7 +124,10 @@ typedef enum
 } NuTextureType;
 
 typedef enum {
-	NU_TEXTURE_FORMAT_R8G8B8,
+	NU_TEXTURE_FORMAT_R8_UNORM,
+	NU_TEXTURE_FORMAT_R8G8_UNORM,
+	NU_TEXTURE_FORMAT_R8G8B8_UNORM,
+	NU_TEXTURE_FORMAT_R8G8B8A8_UNORM,
 } NuTextureFormat;
 
 typedef enum {
@@ -205,7 +208,9 @@ typedef struct {
 	NuBlendState defaultBlendState;
 	NuBlendState additiveBlendState;
 	NuBlendState alphaBlendState;
-} NuDeviceDefaultStates;
+	NuSampler    nearestSampler;
+	NuSampler    linearSampler;
+} NuDeviceDefaults;
 
 typedef struct {
 	NuTextureType   type;
@@ -283,7 +288,7 @@ NUNKI_API NuResult nuCreateSampler(NuSamplerCreateInfo const* info, NuAllocator*
 /**
  * Write the #documentation.
  */
-NUNKI_API void nuDestorySampler(NuSampler sampler, NuAllocator* allocator);
+NUNKI_API void nuDestroySampler(NuSampler sampler, NuAllocator* allocator);
 
 /**
  * Write the #documentation.
@@ -318,12 +323,7 @@ NUNKI_API void nuDeviceSetConstantBuffers(NuContext context, uint base, uint cou
 /**
  * Write the #documentation.
  */
-NUNKI_API void nuDeviceSetTextures(NuContext context, uint base, uint count, NuTexture const* textures);
-
-/**
- * Write the #documentation.
- */
-NUNKI_API void nuDeviceSetSamplers(NuContext context, uint base, uint count, NuSampler const* samplers);
+NUNKI_API void nuDeviceSetTextures(NuContext context, uint base, uint count, NuTexture const* textures, NuSampler const* samplers);
 
 /**
  * Write the #documentation.
@@ -343,4 +343,4 @@ NUNKI_API void nuDeviceSwapBuffers(NuContext context);
 /**
  * Write the #documentation.
  */
-NUNKI_API NuDeviceDefaultStates const* nuDeviceGetDefaultStates(void);
+NUNKI_API NuDeviceDefaults const* nuDeviceGetDefaults(void);

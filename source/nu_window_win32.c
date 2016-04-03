@@ -14,9 +14,9 @@ static struct
 	bool initialized;
 	HWND dummyWindowHandle;
 	HDC dummyWindowHDC;
-} gWindowModule;
+} gWindow;
 
-#define EnforceInitialized() nEnforce(gWindowModule.initialized, "Window module not initialized.");
+#define EnforceInitialized() nEnforce(gWindow.initialized, "Window module not initialized.");
 
 typedef struct NuWindowImpl
 {
@@ -205,7 +205,7 @@ void* nuWindowGetNativeHandle(NuWindow window)
 
 NuResult nInitWindowModule(void)
 {
-	nEnforce(!gWindowModule.initialized, "Window module has already been initialized.");
+	nEnforce(!gWindow.initialized, "Window module has already been initialized.");
 	
 	/* Retrieve current module of this process */
 	HINSTANCE module = GetModuleHandle(NULL);
@@ -228,35 +228,35 @@ NuResult nInitWindowModule(void)
 	/* Try registering this class. */
 	if (!RegisterClassEx(&winclass)) return false;
 
-	HWND handle = gWindowModule.dummyWindowHandle = CreateWindowEx(WS_EX_APPWINDOW, gClassName, "", WS_CLIPSIBLINGS | WS_CLIPCHILDREN, 0, 0, 1, 1, NULL, NULL, module, NULL);
+	HWND handle = gWindow.dummyWindowHandle = CreateWindowEx(WS_EX_APPWINDOW, gClassName, "", WS_CLIPSIBLINGS | WS_CLIPCHILDREN, 0, 0, 1, 1, NULL, NULL, module, NULL);
 	if (!handle) {
 		return NU_FAILURE;
 	}
 
 	/* Retrieve the device context from the window */
-	HDC hDC = gWindowModule.dummyWindowHDC = GetDC(handle);
+	HDC hDC = gWindow.dummyWindowHDC = GetDC(handle);
 	if (!hDC) {
 		DestroyWindow(handle);
 		return false;
 	}
 
-	gWindowModule.initialized = true;
+	gWindow.initialized = true;
 	return NU_SUCCESS;
 }
 
 void nDeinitWindowModule(void)
 {
-	if (!gWindowModule.initialized) return;
-	ReleaseDC(gWindowModule.dummyWindowHandle, gWindowModule.dummyWindowHDC);
-	DestroyWindow(gWindowModule.dummyWindowHandle);
+	if (!gWindow.initialized) return;
+	ReleaseDC(gWindow.dummyWindowHandle, gWindow.dummyWindowHDC);
+	DestroyWindow(gWindow.dummyWindowHandle);
 	UnregisterClass(gClassName, GetModuleHandle(NULL));
-	gWindowModule.initialized = false;
+	gWindow.initialized = false;
 }
 
 void* nGetDummyWindowHandle(void)
 {
 	EnforceInitialized();
-	return gWindowModule.dummyWindowHandle;
+	return gWindow.dummyWindowHandle;
 }
 
 /*-------------------------------------------------------------------------------------------------

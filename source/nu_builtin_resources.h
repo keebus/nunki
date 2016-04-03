@@ -14,9 +14,6 @@ typedef struct NBuiltinResources {
 	NuVertexLayout vertexLayout2dQuadSolid;
 	NuVertexLayout vertexLayout2dQuadTextured;
 
-	/* samplers */
-	NuSampler samplerLinear;
-
 	/* techniques */
 	NuTechnique technique2dQuadSolid;
 	NuTechnique technique2dQuadTextured;

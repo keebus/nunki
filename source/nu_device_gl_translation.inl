@@ -66,13 +66,16 @@ static const GLenum kGlTextureType[] = {
 };
 
 static const kGlTextureInternalFormat[] = {
-	GL_RGB,
+	GL_R8,
+	GL_RG8,
+	GL_RGB8,
+	GL_RGBA8,
 };
 
 static void ImageFormatToGl(NuImageFormat format, GLenum* pixelFormat, GLenum* pixelType)
 {
 	switch (format) {
-		case NU_IMAGE_FORMAT_RGBA8: *pixelFormat = GL_RGB; *pixelType = GL_UNSIGNED_BYTE; return;
+		case NU_IMAGE_FORMAT_RGBA8: *pixelFormat = GL_RGBA; *pixelType = GL_UNSIGNED_BYTE; return;
 		default: nAssert(false);
 	}
 }
