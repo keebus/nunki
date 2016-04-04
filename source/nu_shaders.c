@@ -50,6 +50,29 @@ const char* N_SHADER_SRC_2D_QUAD_SOLID_VERT =
 		"	gl_Position = scene2d.transform * vec4(position, 0, 1);\n"
 		"}\n";
 
+const char* N_SHADER_SRC_2D_QUAD_TEXTURED_FONT_FRAG = 
+		"/*\n"
+		" * Nunki (simple rendering engine)\n"
+		" * Copyright (C) 2015 Canio Massimo Tristano <massimo.tristano@gmail.com>.\n"
+		" * For licensing info see LICENSE.\n"
+		" */\n"
+		"\n"
+		"#version 330\n"
+		"\n"
+		"uniform sampler2D sTexture;\n"
+		"\n"
+		"flat in vec4 vColor;\n"
+		"in vec3 vUV;\n"
+		"\n"
+		"out vec4 fFragColor;\n"
+		"\n"
+		"void main()\n"
+		"{\n"
+		"	float value = textureLod(sTexture, vUV.xy, 0).r;\n"
+		"	if (value <= 0.01f) discard;\n"
+		"	fFragColor = vec4(vColor.rgb, vColor.a * value);\n"
+		"}\n";
+
 const char* N_SHADER_SRC_2D_QUAD_TEXTURED_FRAG = 
 		"/*\n"
 		" * Nunki (simple rendering engine)\n"

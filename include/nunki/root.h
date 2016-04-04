@@ -46,3 +46,13 @@ NUNKI_API NuResult nuInitialize(NuInitializeInfo const* info, NuAllocator* alloc
  * Write the #documentation.
  */
 NUNKI_API void nuTerminate(void);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuResult nuInitThread(NuAllocator* allocator);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API void nuDeinitThread(NuAllocator* allocator);

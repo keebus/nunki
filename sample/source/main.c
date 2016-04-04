@@ -5,6 +5,8 @@
  */
 
 #include <nunki.h>
+#include <stdio.h>
+#include <malloc.h>
 
 int main()
 {
@@ -38,16 +40,40 @@ int main()
 		.format = NU_TEXTURE_FORMAT_R8G8B8_UNORM,
 	};
 
-	NuTexture texture;
-	nuCreateTexture(&textureInfo, NULL, &texture);
+	NuFont font;
+	nuCreateFont(&(NuFontCreateInfo) {
+		.resolution = 90,
+		.textureWidth = 1024,
+		.textureHeight = 1024,
+		.faceLoader = &nuFileLoader,
+		.numFaces = 2,
+		.faces = (NuFaceInfo[]) {
+			{
+				.userData = "../../sample/data/AmaticSC-Regular.ttf",
+				.size = 30,
+				.charSets = (NuCharSet[]) { 32, 122 },
+				.numCharSets = 1,
+			},
+			{
+				.userData = "../../sample/data/GreatVibes-Regular.otf",
+				.size = 60,
+				.charSets = (NuCharSet[]) { 32, 122 },
+				.numCharSets = 1,
+			}		
+		}
+	}, NULL, nResetTempAlloc(), &font);
 
-	NuImageView imageView = {
-		.format = NU_IMAGE_FORMAT_RGBA8,
-		.size = { 2, 2 },
-		.data = (uint32_t[]) { 0xff0000ff, 0xff00ff00, 0xffff0000, 0xffffffff }
+	NuTextStyle styles[] = {
+		0, nuRGBA(255, 255, 255, 255), /* welcome-to */
+		1, nuRGBA(100, 200, 255, 255), /* nunki */
 	};
 
-	nuTextureUpdateLevels(texture, 0, 1, &imageView);
+
+	NuScene2D scene;
+	nuCreateScene2D(NULL, &scene);
+	nu2dReset(scene, (NuRect2i) { 0, 0, 1270, 720 });
+	nu2dBeginText(scene, font);
+	nu2dText(scene, "Welcome to\n<1>Nunki</>", (NuPoint2i) { 50, 50 }, styles, 0);
 
 	NuWindowEvent e;
 	for (;;)
@@ -65,24 +91,13 @@ int main()
 			.viewport = (NuRect2i) { 0, 0, 1280, 720 },
 		};
 		
-		
-		nu2dImmediateBegin(&imm2dInfo);
-
-		nu2dBeginQuadsTextured(NULL, &(Nu2dQuadsTexturedBeginInfo) {
-			.blendState = &nuDeviceGetDefaults()->defaultBlendState,
-			.texture = texture,
-			.sampler = nuDeviceGetDefaults()->linearSampler,
-		});
-
-		nu2dQuadTextured(NULL, (NuRect2) { 10, 10, 100, 100 }, 0xffffffff, (NuRect2) { 0, 0, 1, 1 }, 0);
-		
-		nu2dImmediateEnd();
+		nu2dPresent(scene, context);
 
 		nuDeviceSwapBuffers(context);
 	}
 
 after_mainloop:
-	nuDestroyTexture(texture, NULL);
+	nuDestroyFont(font, NULL);
 	nuDestroyContext(context, NULL);
 	nuDestroyWindow(window, NULL);
 	nuTerminate();

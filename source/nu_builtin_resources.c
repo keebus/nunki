@@ -73,14 +73,21 @@ static void CreateTechniques(void)
 	info2d.layout = gBuiltins.vertexLayout2dQuadSolid;
 	info2d.vertexShaderSource = N_SHADER_SRC_2D_QUAD_SOLID_VERT;
 	info2d.fragmentShaderSource = N_SHADER_SRC_2D_QUAD_SOLID_FRAG;
-	CompileTechnique("SolidQuad2D", &info2d, &gBuiltins.technique2dQuadSolid);
+	CompileTechnique("2D quad solid", &info2d, &gBuiltins.technique2dQuadSolid);
 
-	/* textured quad 2d tetured */
+	/* textured quad 2d textured */
 	info2d.layout = gBuiltins.vertexLayout2dQuadTextured;
 	info2d.vertexShaderSource = N_SHADER_SRC_2D_QUAD_TEXTURED_VERT;
 	info2d.fragmentShaderSource = N_SHADER_SRC_2D_QUAD_TEXTURED_FRAG;
 	info2d.samplers = (const char*[]) { "sTexture", NULL };
-	CompileTechnique("TexturedQuad2D", &info2d, &gBuiltins.technique2dQuadTextured);
+	CompileTechnique("2d quad textured", &info2d, &gBuiltins.technique2dQuadTextured);
+
+		/* textured quad 2d textured for fonts */
+	info2d.layout = gBuiltins.vertexLayout2dQuadTextured;
+	info2d.vertexShaderSource = N_SHADER_SRC_2D_QUAD_TEXTURED_VERT;
+	info2d.fragmentShaderSource = N_SHADER_SRC_2D_QUAD_TEXTURED_FONT_FRAG;
+	info2d.samplers = (const char*[]) { "sTexture", NULL };
+	CompileTechnique("2d quad textured font", &info2d, &gBuiltins.technique2dQuadTexturedFont);
 }
 
 

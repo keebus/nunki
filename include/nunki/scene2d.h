@@ -8,6 +8,7 @@
 
 #include "./base.h"
 #include "./device.h"
+#include "./font.h"
 
 NU_HANDLE(NuScene2D);
 
@@ -64,15 +65,11 @@ NUNKI_API NuResult nu2dReset(NuScene2D scene, NuRect2i viewport);
  */
 NUNKI_API void nu2dPresent(NuScene2D scene, NuContext context);
 
-/**
- * Write the #documentation.
- */
-NUNKI_API NuResult nu2dBeginQuadsSolid(NuScene2D scene, const Nu2dQuadsSolidBeginInfo* info);
 
 /**
  * Write the #documentation.
  */
-NUNKI_API NuResult nu2dBeginQuadsTextured(NuScene2D scene, const Nu2dQuadsTexturedBeginInfo* info);
+NUNKI_API NuResult nu2dBeginQuadsSolid(NuScene2D scene, const Nu2dQuadsSolidBeginInfo* info);
 
 /**
  * Write the #documentation.
@@ -84,6 +81,12 @@ NUNKI_API NuResult nu2dQuadSolid(NuScene2D scene, NuRect2 rect, uint32_t color);
  */
 NUNKI_API NuResult nu2dQuadSolidEx(NuScene2D scene, NuRect2 rect, uint32_t topLeftColor, uint32_t topRightColor, uint32_t bottomLeftColor, uint32_t bottomRightColor);
 
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuResult nu2dBeginQuadsTextured(NuScene2D scene, const Nu2dQuadsTexturedBeginInfo* info);
+
 /**
  * Write the #documentation.
  */
@@ -93,3 +96,14 @@ NUNKI_API NuResult nu2dQuadTextured(NuScene2D scene, NuRect2 rect, uint32_t colo
  * Write the #documentation.
  */
 NUNKI_API NuResult nu2dQuadTexturedEx(NuScene2D scene, NuRect2 rect, uint32_t topLeftColor, uint32_t topRightColor, uint32_t bottomLeftColor, uint32_t bottomRightColor, NuRect2 uvRect, uint textureIndex);
+
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuResult nu2dBeginText(NuScene2D scene, NuFont font);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuResult nu2dText(NuScene2D scene, const char* text, NuPoint2i position, NuTextStyle const* styles, uint initialStyleIndex);

@@ -12,3 +12,4 @@
 #include "nunki/image.h"
 #include "nunki/device.h"
 #include "nunki/scene2d.h"
+#include "nunki/font.h"

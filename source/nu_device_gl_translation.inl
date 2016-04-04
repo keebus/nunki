@@ -75,7 +75,10 @@ static const kGlTextureInternalFormat[] = {
 static void ImageFormatToGl(NuImageFormat format, GLenum* pixelFormat, GLenum* pixelType)
 {
 	switch (format) {
-		case NU_IMAGE_FORMAT_RGBA8: *pixelFormat = GL_RGBA; *pixelType = GL_UNSIGNED_BYTE; return;
+		case NU_IMAGE_FORMAT_R8: *pixelFormat = GL_RED; *pixelType = GL_UNSIGNED_BYTE; return;
+		case NU_IMAGE_FORMAT_R8G8: *pixelFormat = GL_RG; *pixelType = GL_UNSIGNED_BYTE; return;
+		case NU_IMAGE_FORMAT_R8G8B8: *pixelFormat = GL_RGB; *pixelType = GL_UNSIGNED_BYTE; return;
+		case NU_IMAGE_FORMAT_R8G8B8A8: *pixelFormat = GL_RGBA; *pixelType = GL_UNSIGNED_BYTE; return;
 		default: nAssert(false);
 	}
 }

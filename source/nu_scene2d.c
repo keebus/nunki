@@ -6,6 +6,7 @@
 
 #include "nu_scene2d.h"
 #include "nu_builtin_resources.h"
+#include "nu_font.h"
 #include "nu_math.h"
 #include "nu_libs.h"
 
@@ -59,6 +60,10 @@ typedef struct {
 	DeviceState deviceState;
 	uint firstInstanceOffset;
 	uint instanceCount;
+	union
+	{
+		NuFont font;
+	} extra;
 } Command;
 
 typedef struct {
@@ -205,7 +210,7 @@ static Command* NewCommand(Scene2D* scene, DeviceState const* deviceState)
 
 	command->firstInstanceOffset = nArrayLen(*instanceData);
 	command->instanceCount = 0;
-
+	nZero(&command->extra);
 	return command;
 }
 
@@ -229,6 +234,18 @@ static inline void* NewInstance(NuScene2D scene, MeshType checkMeshType)
 		kMeshTypeStr[command->deviceState.meshType], kMeshTypeStr[checkMeshType]);
 	++command->instanceCount;
 	return instance;
+}
+
+static inline Command* LastCommand(NuScene2D scene)
+{
+	EnforceInitialized();
+	if (scene) {
+		uint n = nArrayLen(scene->commands);
+		return n > 0 ? &scene->commands[n - 1] : NULL;
+	}
+	else {
+		return gScene2D.immediateHasCommand ? &gScene2D.immediateCommand : NULL;
+	}
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -339,7 +356,7 @@ NuResult nuCreateScene2D(NuAllocator* allocator, NuScene2D* ppScene)
 {
 	EnforceInitialized();
 	allocator = nGetDefaultOrAllocator(allocator);
-	*ppScene = nNew(Scene2D, allocator);
+	*ppScene = n_new(Scene2D, allocator);
 	Scene2D* scene = *ppScene;
 	if (!scene) return NU_ERROR_OUT_OF_MEMORY;
 	scene->allocator = *allocator;
@@ -353,7 +370,7 @@ void nuDestroyScene2D(NuScene2D scene, NuAllocator* allocator)
 	allocator = nGetDefaultOrAllocator(allocator);
 	nArrayFree(scene->commands, allocator);
 	nArrayFree(scene->instanceData, allocator);
-	nFree(scene, nGetDefaultOrAllocator(allocator));
+	n_free(scene, nGetDefaultOrAllocator(allocator));
 }
 
 NuResult nu2dReset(NuScene2D scene, NuRect2i viewport)
@@ -393,22 +410,6 @@ NuResult nu2dBeginQuadsSolid(NuScene2D scene, const Nu2dQuadsSolidBeginInfo* inf
 	return command ? NU_SUCCESS : NU_ERROR_OUT_OF_MEMORY;
 }
 
-NuResult nu2dBeginQuadsTextured(NuScene2D scene, const Nu2dQuadsTexturedBeginInfo* info)
-{
-	EnforceInitialized();
-	DeviceState state = {
-		.meshType   = MESH_TYPE_QUAD_TEXTURED,
-		.technique  = nGetBuiltins()->technique2dQuadTextured,
-		.blendState = info->blendState,
-		.texture    = info->texture,
-		.sampler    = info->sampler,
-		.enableTextures = true,
-	};
-
-	Command* command = NewCommand(scene, &state);
-	return command ? NU_SUCCESS : NU_ERROR_OUT_OF_MEMORY;
-}
-
 NuResult nu2dQuadSolid(NuScene2D scene, NuRect2 rect, uint32_t color)
 {
 	QuadSolid* quad = NewInstance(scene, MESH_TYPE_QUAD_SOLID);
@@ -416,7 +417,7 @@ NuResult nu2dQuadSolid(NuScene2D scene, NuRect2 rect, uint32_t color)
 		return NU_ERROR_OUT_OF_MEMORY;
 	}
 	quad->rect = rect;
-	quad->color = nSwizzleUInt(color);
+	quad->color = color;
 	return NU_SUCCESS;
 }
 
@@ -425,6 +426,22 @@ NuResult nu2dQuadSolidEx(NuScene2D scene, NuRect2 rect, uint32_t topLeftColor, u
 	EnforceInitialized();
 	nEnforce(false, "Unimplemented.");
 	return 0;
+}
+
+NuResult nu2dBeginQuadsTextured(NuScene2D scene, const Nu2dQuadsTexturedBeginInfo* info)
+{
+	EnforceInitialized();
+	DeviceState state = {
+		.meshType = MESH_TYPE_QUAD_TEXTURED,
+		.technique = nGetBuiltins()->technique2dQuadTextured,
+		.blendState = info->blendState,
+		.texture = info->texture,
+		.sampler = info->sampler,
+		.enableTextures = true,
+	};
+
+	Command* command = NewCommand(scene, &state);
+	return command ? NU_SUCCESS : NU_ERROR_OUT_OF_MEMORY;
 }
 
 NuResult nu2dQuadTextured(NuScene2D scene, NuRect2 rect, uint32_t color, NuRect2 uvRect, uint textureIndex)
@@ -446,4 +463,49 @@ NuResult nu2dQuadTexturedEx(NuScene2D scene, NuRect2 rect, uint32_t topLeftColor
 	EnforceInitialized();
 	nEnforce(false, "Unimplemented.");
 	return 0;
+}
+
+NuResult nu2dBeginText(NuScene2D scene, NuFont font)
+{
+	EnforceInitialized();
+	DeviceState state = {
+		.meshType = MESH_TYPE_QUAD_TEXTURED,
+		.technique = nGetBuiltins()->technique2dQuadTexturedFont,
+		.blendState = &nuDeviceGetDefaults()->alphaBlendState,
+		.texture = nFontGetTexture(font),
+		.sampler = nuDeviceGetDefaults()->nearestSampler,
+		.enableTextures = true,
+	};
+
+	Command* command = NewCommand(scene, &state);
+	command->extra.font = font;
+	return command ? NU_SUCCESS : NU_ERROR_OUT_OF_MEMORY;
+}
+
+typedef struct
+{
+	NuScene2D scene;
+	NuPoint2i position;
+} DrawFontCharQuadContext;
+
+static void DrawFontCharQuad(NuTextStyle const* style, NuRect2i bounds, NuRect2 textureBounds, void* userData)
+{
+	DrawFontCharQuadContext* ctx = userData;
+	bounds.position.x += ctx->position.x;
+	bounds.position.y += ctx->position.y;
+	nu2dQuadTextured(ctx->scene, nuRect2IntToFloat(bounds), style->color, textureBounds, 0);
+}
+
+NuResult nu2dText(NuScene2D scene, const char* text, NuPoint2i position, NuTextStyle const* styles, uint initialStyleIndex)
+{
+	Command* command = LastCommand(scene);
+	nEnforce(command->extra.font, "Last command does is not of type BeginText.");
+	
+	NuFont font = command->extra.font;
+	nuFontProcessText(font, text, styles, initialStyleIndex, DrawFontCharQuad, &(DrawFontCharQuadContext)
+	{
+		scene, position
+	});
+
+	return NU_SUCCESS;
 }

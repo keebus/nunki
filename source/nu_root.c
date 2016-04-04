@@ -9,15 +9,16 @@
 #include "nu_device.h"
 #include "nu_builtin_resources.h"
 #include "nu_scene2d.h"
+#include "nu_font.h"
 #include "nu_base.h"
 #include "nu_libs.h"
 
 static struct {
 	bool initialized;
 	NuAllocator allocator;
-} gInstance;
+} gRoot;
 
-#define EnforceInitialized() nEnforce(gInstance.initialized, "Nunki uninitialized.");
+#define EnforceInitialized() nEnforce(gRoot.initialized, "Nunki uninitialized.");
 
 uint yuGetVersionMajor(void) { return NUNKI_VERSION_MAJOR; }
 uint yuGetVersionMinor(void) { return NUNKI_VERSION_MINOR; }
@@ -30,20 +31,30 @@ const char* yuGetVersionString(void)
 
 NuResult nuInitialize(NuInitializeInfo const* info, NuAllocator* allocator)
 {
-	nEnforce(!gInstance.initialized, "Nunki already initialized.");
+	nEnforce(!gRoot.initialized, "Nunki already initialized.");
 	
-	gInstance.initialized = true;
-	allocator = nGetDefaultOrAllocator(allocator);
-	gInstance.allocator = *allocator;
-
 	NuResult result;
+	if (result = nInitThreadTempAllocator(allocator)) {
+		nDebugError("Could not initialize thread temporary allocator.");
+		return result;
+	}
 
+	gRoot.initialized = true;
+	allocator = nGetDefaultOrAllocator(allocator);
+	gRoot.allocator = *allocator;
+	
 	if (result = nInitWindowModule()) {
 		nuTerminate();
 		return result;
 	}
 
 	if (result = nInitDevice(allocator, nGetDummyWindowHandle())) {
+		nuTerminate();
+		return result;
+	}
+
+	if (result = nInitFontModule()) {
+		nDebugError("Could not initialize font module.");
 		nuTerminate();
 		return result;
 	}
@@ -61,9 +72,21 @@ NuResult nuInitialize(NuInitializeInfo const* info, NuAllocator* allocator)
 void nuTerminate(void)
 {
 	EnforceInitialized();
-	nDeinitScene2D(&gInstance.allocator);
-	nDeinitBuiltinResources(&gInstance.allocator);
+	nDeinitScene2D(&gRoot.allocator);
+	nDeinitBuiltinResources(&gRoot.allocator);
+	nDeinitFontModule();
 	nDeinitDevice();
 	nDeinitWindowModule();
-	gInstance.initialized = false;
+	nDeinitThreadTempAllocator(&gRoot.allocator);
+	gRoot.initialized = false;
+}
+
+NuResult nuInitThread(NuAllocator* allocator)
+{
+	return nInitThreadTempAllocator(allocator);
+}
+
+void nuDeinitThread(NuAllocator* allocator)
+{
+	nDeinitThreadTempAllocator(allocator);
 }

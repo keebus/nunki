@@ -26,7 +26,7 @@ NuResult nuCreateImage(NuImageCreateInfo const* info, NuAllocator* allocator, Nu
 	/* compute total image size */
 	uint byteSize = kPixelSize[info->format] * info->size.width * info->size.height;
 
-	Image* image = nMalloc(sizeof(Image) + byteSize, allocator);
+	Image* image = n_malloc(sizeof(Image) + byteSize, allocator);
 	if (!image) { return NU_ERROR_OUT_OF_MEMORY; }
 
 	image->format = info->format;
@@ -44,7 +44,7 @@ NuResult nuCreateImage(NuImageCreateInfo const* info, NuAllocator* allocator, Nu
 void nuDestroyImage(NuImage image, NuAllocator* allocator)
 {
 	if (!image) return;
-	nFree(image, allocator);
+	n_free(image, allocator);
 }
 
 NuImageView nuImageGetView(NuImage const image)

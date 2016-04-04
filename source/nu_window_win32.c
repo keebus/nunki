@@ -133,7 +133,7 @@ NuResult nuCreateWindow(NuWindowCreateInfo const *info, NuAllocator* allocator, 
 	RegisterRawInputDevices(Rid, 1, sizeof(Rid[0]));
 
 	/* create the window */
-	Window* window = nNew(Window, allocator);
+	Window* window = n_new(Window, allocator);
 	window->handle = handle;
 	window->width = info->width;
 	window->height = info->height;
@@ -157,7 +157,7 @@ void nuDestroyWindow(NuWindow window, NuAllocator* allocator)
 	DestroyWindow(window->handle);
 	window->handle = 0;
 
-	nFree(window, allocator);
+	n_free(window, allocator);
 }
 
 void nuWindowSetTitle(NuWindow window, const char* title)

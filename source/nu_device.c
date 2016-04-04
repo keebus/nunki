@@ -224,22 +224,29 @@ NuResult nInitDevice(NuAllocator* allocator, void* dummyWindowHandle)
 	/* create device defaults */
 	{
 		gDevice.defaults = (NuDeviceDefaults) {
-			.defaultBlendState = { 0 },
-				.additiveBlendState = {
-					.srcRgbFactor = NU_BLEND_FACTOR_ONE,
-					.dstRgbFactor = NU_BLEND_FACTOR_ONE,
-					.rgbOp = NU_BLEND_FUNC_ADD,
-					.srcAlphaFactor = NU_BLEND_FACTOR_ONE,
-					.dstAlphaFactor = NU_BLEND_FACTOR_ONE,
-					.alphaOp = NU_BLEND_FUNC_ADD,
+			.defaultBlendState = { 
+				.srcRgbFactor = NU_BLEND_FACTOR_ONE,
+				.dstRgbFactor = NU_BLEND_FACTOR_ZERO,
+				.rgbOp = NU_BLEND_FUNC_ADD,
+				.srcAlphaFactor = NU_BLEND_FACTOR_ONE,
+				.dstAlphaFactor = NU_BLEND_FACTOR_ZERO,
+				.alphaOp = NU_BLEND_FUNC_ADD,
 			},
-				.alphaBlendState = {
-					.srcRgbFactor = NU_BLEND_FACTOR_SRC_ALPHA,
-					.dstRgbFactor = NU_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-					.rgbOp = NU_BLEND_FUNC_ADD,
-					.srcAlphaFactor = NU_BLEND_FACTOR_ONE,
-					.dstAlphaFactor = NU_BLEND_FACTOR_ZERO,
-					.alphaOp = NU_BLEND_FUNC_ADD,
+			.additiveBlendState = {
+				.srcRgbFactor = NU_BLEND_FACTOR_ONE,
+				.dstRgbFactor = NU_BLEND_FACTOR_ONE,
+				.rgbOp = NU_BLEND_FUNC_ADD,
+				.srcAlphaFactor = NU_BLEND_FACTOR_ONE,
+				.dstAlphaFactor = NU_BLEND_FACTOR_ONE,
+				.alphaOp = NU_BLEND_FUNC_ADD,
+			},
+			.alphaBlendState = {
+				.srcRgbFactor = NU_BLEND_FACTOR_SRC_ALPHA,
+				.dstRgbFactor = NU_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+				.rgbOp = NU_BLEND_FUNC_ADD,
+				.srcAlphaFactor = NU_BLEND_FACTOR_ONE,
+				.dstAlphaFactor = NU_BLEND_FACTOR_ZERO,
+				.alphaOp = NU_BLEND_FUNC_ADD,
 			},
 		};
 
@@ -283,7 +290,7 @@ NuResult nuCreateVertexLayout(NuVertexLayoutDesc* const desc, NuAllocator *alloc
 
 	*pLayout = NULL;
 
-	VertexLayout* layout = nNew(VertexLayout, GetDeviceAllocator(allocator));
+	VertexLayout* layout = n_new(VertexLayout, GetDeviceAllocator(allocator));
 	if (!layout) return NU_FAILURE;
 
 	layout->numStreams = desc->numStreams;
@@ -314,7 +321,7 @@ NuResult nuCreateVertexLayout(NuVertexLayoutDesc* const desc, NuAllocator *alloc
 void nuDestroyVertexLayout(NuVertexLayout vlayout, NuAllocator *allocator)
 {
 	EnforceInitialized();
-	nFree(vlayout, GetDeviceAllocator(allocator));
+	n_free(vlayout, GetDeviceAllocator(allocator));
 }
 
 static GLuint CreateShader(GLenum type, const char *source, char* message_buffer, uint message_buffer_size)
@@ -442,7 +449,7 @@ NuResult nuCreateBuffer(NuBufferCreateInfo const* info, NuAllocator* allocator, 
 		return NU_FAILURE;
 	}
 
-	Buffer *buffer = nNew(Buffer, GetDeviceAllocator(allocator));
+	Buffer *buffer = n_new(Buffer, GetDeviceAllocator(allocator));
 	buffer->id = id;
 	buffer->type = info->type;
 	buffer->usage = info->usage;
@@ -460,7 +467,7 @@ void nuDestroyBuffer(NuBuffer buffer, NuAllocator* allocator)
 	if (!buffer) return;
 
 	glDeleteBuffers(1, &buffer->id);
-	nFree(buffer, GetDeviceAllocator(allocator));
+	n_free(buffer, GetDeviceAllocator(allocator));
 }
 
 void nuBufferUpdate(NuBuffer buffer, uint offset, const void* data, uint size)
@@ -489,7 +496,7 @@ NuResult nuCreateContext(NuContextCreateInfo const* info, NuAllocator* allocator
 {
 	EnforceInitialized();
 	*outContext = NULL;
-	Context* context = nNew(Context, GetDeviceAllocator(allocator));
+	Context* context = n_new(Context, GetDeviceAllocator(allocator));
 	if (!context) {
 		return NU_ERROR_OUT_OF_MEMORY;
 	}
@@ -519,7 +526,7 @@ void nuDestroyContext(NuContext context, NuAllocator* allocator)
 {
 	EnforceInitialized();
 	nDeinitGlContext(&gDevice.nglContextManager, &context->nglContext);
-	nFree(context, GetDeviceAllocator(allocator));
+	n_free(context, GetDeviceAllocator(allocator));
 }
 
 NuResult nuCreateTexture(NuTextureCreateInfo const* info, NuAllocator* allocator, NuTexture* ppTexture)
@@ -528,13 +535,13 @@ NuResult nuCreateTexture(NuTextureCreateInfo const* info, NuAllocator* allocator
 	allocator = nGetDefaultOrAllocator(allocator);
 
 	*ppTexture = NULL;
-	Texture* pTexture = nNew(Texture, allocator);
+	Texture* pTexture = n_new(Texture, allocator);
 	if (!pTexture) return NU_ERROR_OUT_OF_MEMORY;
 
 	glGenTextures(1, &pTexture->id);
 	if (!pTexture->id) {
 		nDebugError("Could not create OpenGL texture object.");
-		nFree(pTexture, allocator);
+		n_free(pTexture, allocator);
 		return NU_FAILURE;
 	}
 
@@ -552,7 +559,7 @@ void nuDestroyTexture(NuTexture texture, NuAllocator* allocator)
 	if (!texture) return;
 	allocator = nGetDefaultOrAllocator(allocator);
 	glDeleteTextures(1, &texture->id);
-	nFree(texture, allocator);
+	n_free(texture, allocator);
 }
 
 void nuTextureUpdateLevels(NuTexture texture, uint baseLevel, uint numLevels, NuImageView const* images)
@@ -581,7 +588,7 @@ NuResult nuCreateSampler(NuSamplerCreateInfo const* info, NuAllocator* allocator
 	allocator = nGetDefaultOrAllocator(allocator);
 	*ppSampler = NULL;
 
-	Sampler* pSampler = nNew(Sampler, allocator);
+	Sampler* pSampler = n_new(Sampler, allocator);
 	if (!pSampler) return NU_ERROR_OUT_OF_MEMORY;
 
 	glGenSamplers(1, &pSampler->id);
@@ -600,7 +607,6 @@ NuResult nuCreateSampler(NuSamplerCreateInfo const* info, NuAllocator* allocator
 	glSamplerParameterf(pSampler->id, GL_TEXTURE_WRAP_S, kGlSamplerWrapMode[pSampler->uWrapMode]);
 	glSamplerParameterf(pSampler->id, GL_TEXTURE_WRAP_T, kGlSamplerWrapMode[pSampler->vWrapMode]);
 
-	
 	*ppSampler = pSampler;
 	return NU_SUCCESS;
 }
@@ -610,7 +616,7 @@ void nuDestroySampler(NuSampler sampler, NuAllocator* allocator)
 	if (!sampler) return;
 	allocator = nGetDefaultOrAllocator(allocator);
 	glDeleteSamplers(1, &sampler->id);
-	nFree(sampler, allocator);
+	n_free(sampler, allocator);
 }
 
 void nuDeviceClear(NuContext context, NuClearFlags flags, float* color4, float depth, uint stencil)

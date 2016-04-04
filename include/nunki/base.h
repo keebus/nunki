@@ -38,9 +38,21 @@ typedef enum NuResult {
 typedef struct NuAllocator {
 	void*   userData;
 	void* (*malloc)(size_t size, size_t alignment, void* userData);
-	void* (*realloc)(void* ptr, size_t alignment, size_t newSize, void* userData);
+	void* (*realloc)(void* ptr, size_t newSize, size_t alignment, void* userData);
 	void  (*free)(void* ptr, void* userData);
 } NuAllocator;
+
+NU_HANDLE(NuTempAllocator);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API NuTempAllocator nResetTempAlloc(void);
+
+/**
+ * Write the #documentation.
+ */
+NUNKI_API size_t nuFileLoader(void* buffer, size_t bufferSize, void* faceUserData, void* loaderUserData);
 
 typedef struct {
 	int x, y;
@@ -75,3 +87,13 @@ typedef struct {
 	NuPoint2 position;
 	NuSize2  size;
 } NuRect2;
+
+inline NuRect2 nuRect2IntToFloat(NuRect2i r)
+{
+	return (NuRect2) { (float)r.position.x, (float)r.position.y, (float)r.size.width, (float)r.size.height };
+}
+
+inline uint nuRGBA(uint red, uint green, uint blue, uint alpha)
+{
+	return (alpha & 0xff) << 24 | (blue & 0xff) << 16 | (green & 0xff) << 8 | (red & 0xff);
+}

@@ -11,7 +11,10 @@
 NU_HANDLE(NuImage);
 
 typedef enum {
-	NU_IMAGE_FORMAT_RGBA8,
+	NU_IMAGE_FORMAT_R8,
+	NU_IMAGE_FORMAT_R8G8,
+	NU_IMAGE_FORMAT_R8G8B8,
+	NU_IMAGE_FORMAT_R8G8B8A8,
 	NU_IMAGE_FORMAT_COUNT_,
 } NuImageFormat;
 
@@ -46,3 +49,4 @@ NUNKI_API NuImageView nuImageGetView(NuImage const image);
  * Write the #documentation.
  */
 NUNKI_API void* nuImageGetWritableDataPtr(NuImage image);
+

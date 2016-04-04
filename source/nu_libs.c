@@ -97,14 +97,14 @@ bool nArrayReserveEx(void** parray, NuAllocator* allocator, uint elementSize, ui
 		totalSize -= n_alignof(void*); // remove max alignment
 
 		/* allocate the new array and copy the data over */
-		ArrayHeader* newArrayHeader = nMalloc(totalSize, allocator);
+		ArrayHeader* newArrayHeader = n_malloc(totalSize, allocator);
 		if (!newArrayHeader) return false;
 
 		void* new_array = (char*)newArrayHeader + dataOffset;
 
 		if (*parray) {
 			memcpy(new_array, *parray, elementSize * oldLength);
-			nFree(header, allocator);
+			n_free(header, allocator);
 		}
 
 		header = newArrayHeader;
@@ -133,7 +133,7 @@ void* nArrayPushEx(void** parray, NuAllocator* allocator, uint elementSize, uint
 
 void nArrayFree(void* array, NuAllocator* allocator)
 {
-	if (array) nFree(getArrayHeader(array), allocator);
+	if (array) n_free(getArrayHeader(array), allocator);
 }
 
 void nArrayClear(void* array)

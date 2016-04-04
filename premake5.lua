@@ -65,12 +65,12 @@ solution "Nunki"
 	platforms { "x64" }
 	characterset "MBCS"
 
-	configuration { "Debug", "x64" };		targetdir("bin/debug64")
-	configuration { "Optimized", "x64"}; 	targetdir("bin/optimized64")
-	configuration { "Release", "x64" };		targetdir("bin/release64")
-	configuration { "Debug", "x32" };		targetdir("bin/debug32")
-	configuration { "Optimized", "x32"};	targetdir("bin/optimized32")
-	configuration { "Release", "x32" };		targetdir("bin/release32")
+	configuration { "Debug", "x64" };		targetdir("bin/debug64"); debugdir("bin/debug64")
+	configuration { "Optimized", "x64"}; 	targetdir("bin/optimized64"); debugdir("bin/optimized64")
+	configuration { "Release", "x64" };		targetdir("bin/release64"); debugdir("bin/release64")
+	configuration { "Debug", "x32" };		targetdir("bin/debug32"); debugdir("bin/debug32")
+	configuration { "Optimized", "x32"};	targetdir("bin/optimized32"); debugdir("bin/optimized32")
+	configuration { "Release", "x32" };		targetdir("bin/release32"); debugdir("bin/release32")
 
 	filter { "configurations:Debug" }
 		defines { "DEBUG" }
@@ -100,7 +100,8 @@ solution "Nunki"
 		targetname "nunki"
 		includedirs "include"
 		files { "include/**.h", "source/**.h", "source/**.inl", "source/**.c", "source/**.glsl" }
-		links { "opengl32", "glu32" }
+		links { "freetype261" }
+		configuration "windows"; links { "opengl32", "glu32" }
 		configuration {}
 
 	project "NunkiSample"

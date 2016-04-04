@@ -17,6 +17,7 @@ typedef struct NBuiltinResources {
 	/* techniques */
 	NuTechnique technique2dQuadSolid;
 	NuTechnique technique2dQuadTextured;
+	NuTechnique technique2dQuadTexturedFont;
 
 } NBuiltinResources;
 

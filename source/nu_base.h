@@ -16,15 +16,40 @@ inline NuAllocator* nGetDefaultOrAllocator(NuAllocator* allocator)
 	return allocator ? allocator : &nDefaultAllocator;
 }
 
-static inline void* nNewEx(NuAllocator* allocator, size_t size, size_t alignment)
+static inline void* n_newEx(NuAllocator* allocator, size_t size, size_t alignment)
 {
 	void* ptr = allocator->malloc(size, alignment, allocator->userData);
 	memset(ptr, 0, size);
 	return ptr;
 }
 
-#define nMalloc(size, pallocator) (pallocator->malloc(size, n_alignof(void*), pallocator->userData))
-#define nNew(type, pallocator) ((type*)nNewEx(pallocator, sizeof(type), n_alignof(type)))
-#define nNewArray(type, length, pallocator) ((type*)nNewEx(pallocator, sizeof(type) * length, n_alignof(type)))
-#define nRealloc(ptr, size, pallocator) (pallocator->realloc(ptr, size, n_alignof(void*), pallocator->userData))
-#define nFree(ptr, pallocator) (pallocator->free(ptr, pallocator->userData))
+#define n_malloc(size, pallocator) (pallocator->malloc(size, n_alignof(void*), pallocator->userData))
+#define n_new(type, pallocator) ((type*)n_newEx(pallocator, sizeof(type), n_alignof(type)))
+#define n_newarray(type, length, pallocator) ((type*)n_newEx(pallocator, sizeof(type) * length, n_alignof(type)))
+#define n_realloc(ptr, size, pallocator) (pallocator->realloc(ptr, size, n_alignof(void*), pallocator->userData))
+#define n_free(ptr, pallocator) (pallocator->free(ptr, pallocator->userData))
+
+/**
+ * Write the #documentation.
+ */
+NuResult nInitThreadTempAllocator(NuAllocator* allocator);
+
+/**
+ * Write the #documentation.
+ */
+void nDeinitThreadTempAllocator(NuAllocator* allocator);
+
+/**
+ * Write the #documentation.
+ */
+inline NuAllocator* nAllocatorFromTemp(NuTempAllocator tempAllocator) { return (NuAllocator*)tempAllocator; }
+
+/**
+ * Write the #documentation.
+ */
+void nTempAllocatorLockMalloc(void);
+
+/**
+ * Write the #documentation.
+ */
+void nTempAllocatorUnlockMalloc(void);

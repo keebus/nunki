@@ -15,9 +15,9 @@ static struct {
 	bool initialized;
 	NuAllocator allocator;
 	NBuiltinResources builtins;
-} gInstance;
+} gRoot;
 
-#define EnforceInitialized() nEnforce(gInstance.initialized, "Nunki uninitialized.");
+#define EnforceInitialized() nEnforce(gRoot.initialized, "Nunki uninitialized.");
 
 uint yuGetVersionMajor(void) { return NUNKI_VERSION_MAJOR; }
 uint yuGetVersionMinor(void) { return NUNKI_VERSION_MINOR; }
@@ -30,11 +30,11 @@ const char* yuGetVersionString(void)
 
 NuResult nuInitialize(NuInitializeInfo const* info, NuAllocator* allocator)
 {
-	nEnforce(!gInstance.initialized, "Nunki already initialized.");
+	nEnforce(!gRoot.initialized, "Nunki already initialized.");
 	
-	gInstance.initialized = true;
+	gRoot.initialized = true;
 	allocator = nGetDefaultOrAllocator(allocator);
-	gInstance.allocator = *allocator;
+	gRoot.allocator = *allocator;
 
 	NuResult result;
 
@@ -48,7 +48,7 @@ NuResult nuInitialize(NuInitializeInfo const* info, NuAllocator* allocator)
 		return result;
 	}
 
-	nInitBuiltinResources(&gInstance.builtins, allocator);
+	nInitBuiltinResources(&gRoot.builtins, allocator);
 
 	return NU_SUCCESS;
 }
@@ -56,8 +56,8 @@ NuResult nuInitialize(NuInitializeInfo const* info, NuAllocator* allocator)
 void nuTerminate(void)
 {
 	EnforceInitialized();
-	nDeinitBuiltinResources(&gInstance.builtins, &gInstance.allocator);
+	nDeinitBuiltinResources(&gRoot.builtins, &gRoot.allocator);
 	nDeinitDevice();
 	nDeinitWindowModule();
-	gInstance.initialized = false;
+	gRoot.initialized = false;
 }
